@@ -1,0 +1,82 @@
+name: Deploy
+
+# Publishes the app shell (app/, without data/) to S3 behind CloudFront. Keyless: the job exchanges its GitHub
+# OIDC token for a 15-minute session of a role that trusts this repository and its `production` environment
+# only, may write the shell objects of one bucket (never data/), and may invalidate one distribution. The role
+# is defined in uncovertechtalent-git/site-infra. GitHub stores no AWS credential: the role ARN, bucket and
+# distribution are secrets only so that the log masks them (the account id is in the ARN).
+#
+# The deploy job waits in the `production` environment for the owner's approval. It is skipped until the
+# repository variable S3_DEPLOY is "on", so the workflow stays quiet before the infrastructure exists.
+# The app has no build step: vanilla JavaScript, served as written.
+#
+# Secrets: environment `production`: AWS_DEPLOY_ROLE_ARN. Repository: SITE_BUCKET, CLOUDFRONT_DISTRIBUTION_ID.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "scripts/ci/deploy-shell.sh"
+      - "scripts/ci/aws-session.sh"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Tests before deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Syntax check of the app files
+        run: |
+          for f in app/*.js; do node --check "$f"; done
+
+  deploy:
+    name: Deploy the shell to S3 and CloudFront
+    needs: test
+    if: github.ref == 'refs/heads/main' && vars.S3_DEPLOY == 'on'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: production
+    permissions:
+      contents: read
+      id-token: write   # the OIDC token the deploy role trusts (environment claim)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Publish the shell and invalidate its paths
+        shell: bash  # adds -o pipefail: a failed token request stops here
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          SITE_BUCKET: ${{ secrets.SITE_BUCKET }}
+          DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+          AWS_REGION: eu-central-1
+        run: |
+          . scripts/ci/aws-session.sh
+          aws_session "$AWS_ROLE_ARN" chain-traveler-deploy 900
+          scripts/ci/deploy-shell.sh app "$SITE_BUCKET" "$DISTRIBUTION_ID"

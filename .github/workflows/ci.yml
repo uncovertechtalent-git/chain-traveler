@@ -42,6 +42,9 @@ jobs:
         run: |
           for f in app/*.js; do node --check "$f"; done
 
+      - name: Build and script tests (manifest, retention, deploy and publish scripts against a fake AWS CLI)
+        run: python3 -I -m unittest discover -s test/build -v
+
   scripts:
     name: Scripts and workflows
     runs-on: ubuntu-24.04

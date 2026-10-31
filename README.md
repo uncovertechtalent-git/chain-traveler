@@ -55,11 +55,47 @@ timetable, and it opens offline. On a phone, use "Add to Home Screen".
 4. `app/sw.js` is the service worker: the shell is network-first with a cache fallback, the timetable is
    cache-first.
 
+## Hosting and data pipeline
+
+The app is static files on S3 behind CloudFront, at chaintraveler.app. The infrastructure is code in
+[uncovertechtalent-git/site-infra](https://github.com/uncovertechtalent-git/site-infra) (private bucket with
+origin access control, CloudFront, ACM certificate, DNS, security headers, the two deploy roles). The timetable
+is not part of the app release: a daily build publishes it to the same CDN, so data never waits on a code
+change or a store review.
+
+| What | When | How | Role (keyless, OIDC) |
+|---|---|---|---|
+| App shell (`app/`, not `data/`) | push to `main`, after the owner approves the `production` environment | `deploy.yml`: tests, then `scripts/ci/deploy-shell.sh` | `chaintraveler-app-github-deploy`: trusts the `production` environment of this repository; writes the shell objects, denied `data/*`; invalidates one distribution |
+| Timetable (`data/`) | daily at 11:17 UTC, and by hand | `timetable.yml`: fetch the gtfs.de feed, build, feed tests, manifest; then `scripts/ci/publish-data.sh` | `chaintraveler-app-github-data`: trusts the `main` branch of this repository; reads and writes `data/*` only |
+
+How a timetable build moves, and what stops a bad one:
+
+1. **Build job, no cloud access.** Fetch `rv_free/latest.zip`, run `build/build_timetable.py`, run the feed tests
+   (`npm run test:feed`: size and age of the window, named chains, a midnight crossing). A failing gate stops
+   the run before anything is published, and the previous build stays current.
+2. **Manifest.** `build/manifest.py make` writes `data/<date>/timetable.bin.gz` and `meta.json` and
+   `data/latest.json`: `{format, date, sha256, bytes, metaSha256, metaBytes, firstDate, nDays, built, feedSha256}`.
+3. **Publish job, no third-party code.** It downloads the artifact and checks it against the manifest, skips when
+   the feed behind the current `latest.json` is unchanged, refuses to overwrite a dated path with other bytes,
+   uploads `data/<date>/` with `Cache-Control: public, max-age=31536000, immutable`, reads it back and verifies it,
+   and only then writes `data/latest.json` (not cached at the edge). Then it deletes all but the newest three builds.
+4. **Rollback.** Run the Timetable workflow by hand with `rollback_to` set to a kept build (`YYYY-MM-DD`): the
+   files are verified and `latest.json` points back at them. Nothing is deleted.
+
+Until the infrastructure exists, `build` runs as a dry run and `publish`, `rollback` and `deploy` are skipped.
+Set the repository variable `S3_DEPLOY` to `on` to enable them. They also need `SITE_BUCKET`,
+`CLOUDFRONT_DISTRIBUTION_ID` and `AWS_DATA_ROLE_ARN` as repository secrets and `AWS_DEPLOY_ROLE_ARN` as a secret
+of the `production` environment (outputs of the site-infra bootstrap and site stacks; none is a credential, they
+are secrets so that the log masks the account id).
+
+Dry run on your machine: `scripts/fetch-feed.sh && npm run test:feed && python3 build/manifest.py make app/data dist-data`.
+
 ## Tests
 
 | Suite | Runs | Covers |
 |---|---|---|
 | `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search. Deterministic, no network. |
+| `test/build/` | on every pull request (Python `unittest`) | The manifest and its checks (changed byte, truncated or missing file, malformed fields), retention of three builds, and `scripts/ci/deploy-shell.sh` and `publish-data.sh` against a fake AWS CLI: the shell deploy never writes under `data/`, the publish never writes outside it, the pointer is written last, a same-day build with other bytes is refused, a damaged upload leaves the old pointer. |
 | `test/feed/` | before a timetable build is published, and locally after `scripts/fetch-feed.sh` | The engine on the real national timetable: size and age of the window, named chains (Wolfsburg to Leipzig and München, München to Wolfsburg via Nürnberg, Wolfsburg to München via Leipzig), the Leipzig footpath, a train past midnight, station search. Days come from the data, bounds are generous ceilings. |
 
 ## Known limits and next steps

@@ -203,7 +203,7 @@ def main(feed, out):
             arr_.byteswap()
         blob += arr_.tobytes()
         blob += b'\0' * (align4(len(blob)) - len(blob))
-    packed = gzip.compress(bytes(blob), 9)
+    packed = gzip.compress(bytes(blob), 9, mtime=0)  # mtime 0: the same feed gives the same bytes
     with open(os.path.join(out, 'timetable.bin.gz'), 'wb') as f:
         f.write(packed)
 
