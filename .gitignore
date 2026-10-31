@@ -1,0 +1,6 @@
+app/data/
+node_modules/
+.feed/
+dist/
+.DS_Store
+__pycache__/

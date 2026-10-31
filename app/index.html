@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Chain Traveler</title>
+<meta name="theme-color" content="#0b6e4f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Chain Traveler</h1>
+    <p class="sub">Chain the next regional trains between any two German stations on the Deutschlandticket, with a stop-over wherever you like. Planned times, read offline from the timetable on this device.</p>
+    <p id="status" class="status">Loading the timetable...</p>
+  </header>
+
+  <main id="app" hidden>
+    <section class="card" aria-label="Trip">
+      <div class="controls">
+        <label class="wide">Start
+          <span class="pick"><input id="src" autocomplete="off" spellcheck="false" placeholder="Station"><ul class="sugg" hidden></ul></span>
+        </label>
+        <label>Date<select id="date"></select></label>
+        <label>Leave after<input id="t0" type="time" value="06:00"></label>
+        <label class="wide">Target
+          <span class="pick"><input id="dst" autocomplete="off" spellcheck="false" placeholder="Station"><ul class="sugg" hidden></ul></span>
+        </label>
+        <label class="wide">Stop-over (optional)
+          <span class="pick"><input id="via" autocomplete="off" spellcheck="false" placeholder="Station"><ul class="sugg" hidden></ul></span>
+        </label>
+        <label>Minimum stay (min)<input id="stay" type="number" min="0" step="15" value="180"></label>
+        <label>Minimum change (min)<input id="tr" type="number" min="0" max="20" value="4"></label>
+      </div>
+      <div class="actions">
+        <button id="plan" type="button" class="primary">Plan chain</button>
+        <button id="swap" type="button">Swap start and target</button>
+        <button id="clearvia" type="button">No stop-over</button>
+      </div>
+    </section>
+
+    <nav class="tabs" role="tablist">
+      <button role="tab" id="tab-chain" aria-selected="true">Chain</button>
+      <button role="tab" id="tab-reach" aria-selected="false">Reach map</button>
+      <button role="tab" id="tab-deps" aria-selected="false">Departures</button>
+    </nav>
+
+    <section id="pane-chain" class="card" role="tabpanel" aria-live="polite"></section>
+
+    <section id="pane-reach" class="card" role="tabpanel" hidden>
+      <div class="reachbar">
+        <label>Show stations reached within <b id="hrs-val">8</b> h of leaving
+          <input id="hrs" type="range" min="1" max="16" value="8">
+        </label>
+        <span class="legend"><i></i> sooner <em></em> later</span>
+      </div>
+      <div class="mapbox"><canvas id="map"></canvas><div id="tip" class="tip" hidden></div></div>
+      <p class="note">Every dot is a station reachable by regional train. Colour shows how soon you can be there from the start station. Click a dot to chain a trip there.</p>
+    </section>
+
+    <section id="pane-deps" class="card" role="tabpanel" hidden>
+      <div class="controls">
+        <label class="wide">Station
+          <span class="pick"><input id="dstation" autocomplete="off" spellcheck="false" placeholder="Station"><ul class="sugg" hidden></ul></span>
+        </label>
+        <label>After<input id="dtime" type="time" value="06:00"></label>
+      </div>
+      <div id="deplist"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p class="note" id="foot"></p>
+  </footer>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

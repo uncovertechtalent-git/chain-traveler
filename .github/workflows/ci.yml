@@ -1,0 +1,90 @@
+name: CI
+
+# Tests and static checks. This workflow holds no cloud credential and cannot reach AWS: the deploy and
+# the timetable build have their own workflows. Every action is pinned to a commit SHA (Dependabot moves
+# the SHA and the version comment together); the one Python tool, zizmor, is pinned with wheel hashes.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Unit tests (engine on an in-memory timetable)
+        run: npm test
+
+      - name: Syntax check of the app files
+        run: |
+          for f in app/*.js; do node --check "$f"; done
+
+  scripts:
+    name: Scripts and workflows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: shellcheck (preinstalled on the runner image)
+        run: shellcheck scripts/*.sh scripts/ci/*.sh
+
+      - name: Python scripts compile
+        run: python3 -I -m py_compile build/*.py
+
+      - name: GitHub-hosted runners only
+        run: scripts/ci/hosted-runners-only.sh
+
+      - name: No credentials or account ids in tracked files
+        run: scripts/ci/no-secrets.sh
+
+  zizmor:
+    name: Workflow security (zizmor)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install zizmor (version and wheel hashes pinned in scripts/ci/zizmor/requirements.txt)
+        run: |
+          python3 -m venv "$RUNNER_TEMP/zizmor"
+          "$RUNNER_TEMP/zizmor/bin/pip" install --require-hashes --no-deps --only-binary :all: -r scripts/ci/zizmor/requirements.txt
+
+      - name: zizmor .github
+        # Online audits (impostor commits, known-vulnerable actions, stale version comments) read the GitHub API with the job token.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$RUNNER_TEMP/zizmor/bin/zizmor" --format github .github'

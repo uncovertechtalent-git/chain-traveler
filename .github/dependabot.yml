@@ -1,0 +1,22 @@
+# Dependabot keeps the commit-SHA pins of GitHub Actions and the zizmor pin current, each after a
+# 7-day cooldown so a release that is pulled or found compromised in its first week never reaches a
+# pull request. The app has no runtime or build dependencies (vanilla JavaScript, Python standard
+# library), so there is no npm or pip manifest to update beyond the zizmor pin.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+  - package-ecosystem: pip
+    directory: "/scripts/ci/zizmor"
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7

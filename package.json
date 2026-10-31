@@ -1,0 +1,11 @@
+{
+  "name": "chain-traveler",
+  "private": true,
+  "type": "module",
+  "description": "Chain regional trains on the Deutschlandticket. No runtime or build dependencies.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test 'test/unit/*.test.mjs'",
+    "test:feed": "node --test 'test/feed/*.test.mjs'"
+  }
+}
