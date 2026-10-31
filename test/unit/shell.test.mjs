@@ -8,8 +8,9 @@ import { fileURLToPath } from 'node:url';
 
 const app = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'app');
 const read = f => fs.readFileSync(path.join(app, f), 'utf8');
-const shellFiles = fs.readdirSync(app, { withFileTypes: true }).filter(d => d.isFile() && !d.name.startsWith('.') && d.name !== 'sw.js').map(d => d.name).sort();
+const shellFiles = fs.readdirSync(app, { withFileTypes: true }).filter(d => d.isFile() && !d.name.startsWith('.') && d.name !== 'sw.js' && d.name !== '404.html').map(d => d.name).sort();
 
+// 404.html is served by the CDN for missing paths (site-infra: custom error response) and is not part of the offline shell.
 test('the service worker precaches exactly the shell files', () => {
   const list = read('sw.js').match(/const SHELL = \[(.*?)\];/s)[1].split(',').map(s => s.trim().replace(/^'|'$/g, '')).filter(Boolean);
   assert.ok(list.includes('./'), 'the root is cached for navigations');
@@ -49,4 +50,10 @@ test('the app makes no network request except to its own files', () => {
   for (const f of ['app.js', 'data-store.js', 'sw.js', 'engine.js']) {
     assert.ok(!/https?:\/\//.test(read(f).replace(/\/\/ .*$/gm, '')), f + ' names an absolute URL');
   }
+});
+
+test('the 404 page exists and needs no script', () => {
+  const html = read('404.html');
+  assert.ok(!/<script/i.test(html) && !/\sstyle\s*=/i.test(html));
+  assert.match(html, /href="\/style\.css"/);
 });
