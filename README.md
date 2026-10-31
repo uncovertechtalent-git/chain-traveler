@@ -17,7 +17,7 @@ Licence: MIT. Timetable data: gtfs.de, data provided by DELFI e.V., CC BY 4.0 (s
 ## Run it
 
 ```sh
-scripts/fetch-feed.sh      # download the feed (about 12 MB) and build app/data/ (about 5 MB)
+scripts/fetch-feed.sh      # download the feed (about 12 MB), build it, lay it out in app/data/ (about 5 MB)
 ./serve.sh                 # http://localhost:8765
 npm test                   # engine unit tests on an in-memory timetable, no feed needed
 npm run test:feed          # engine tests against the built feed in app/data/
@@ -88,13 +88,42 @@ Set the repository variable `S3_DEPLOY` to `on` to enable them. They also need `
 of the `production` environment (outputs of the site-infra bootstrap and site stacks; none is a credential, they
 are secrets so that the log masks the account id).
 
-Dry run on your machine: `scripts/fetch-feed.sh && npm run test:feed && python3 build/manifest.py make app/data dist-data`.
+Dry run on your machine: `scripts/fetch-feed.sh && npm run test:feed` (same layout as the CDN, in `app/data/`, so `./serve.sh` behaves like production).
+
+## Data updates on the device
+
+The app keeps the timetable in Cache Storage and updates itself; there is nothing to install or approve
+(`app/data-store.js`, `app/sw.js`).
+
+1. **Launch.** The build in use is read from the device and verified again (length and sha256 of both files), so
+   the app opens at once, offline too. A damaged or altered entry is dropped, never used.
+2. **Check.** When online, the app fetches `data/latest.json` (never cached) and compares date and hashes with the
+   build in use. Nothing new: no data is downloaded. The app follows the published pointer, also back to an older
+   build after a rollback.
+3. **Download, verify, store.** `data/<date>/timetable.bin.gz` and `meta.json` are downloaded; each must match the
+   length and sha256 in the manifest (`crypto.subtle`) before it is stored under that build's own cache.
+4. **Swap.** The pointer (`ct-data-pointer`) is written last, in one `put`; the engine switches to the new build in
+   the page, the chosen stations and day carry over by name. Only then are older builds deleted.
+5. **Failure.** Offline, a bad manifest or a newer manifest format, wrong bytes, a full disk: the half-written
+   build is removed, the old data stays, and the data-age line says what happened.
+
+The data-age line under the title shows the build date and the last day the timetable covers; it turns into a
+warning three days before the window ends and says so plainly after it. On a first launch there is no build yet,
+so that launch needs a connection.
+
+The shell is separate: `sw.js` precaches each release into its own cache (versioned by a hash of the shell files,
+filled in by the deploy), serves it network-first, and falls back to the cached release offline.
+
+What the sha256 protects, and what it does not: it catches truncated, damaged and mismatched files, including a
+partly synced publish. It does not authenticate the publisher, because the manifest comes from the same origin as
+the files; that trust rests on TLS and on the roles that alone can write the bucket. Signing the manifest is the
+next step if the threat model ever needs it.
 
 ## Tests
 
 | Suite | Runs | Covers |
 |---|---|---|
-| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search. Deterministic, no network. |
+| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. Deterministic, no network. |
 | `test/build/` | on every pull request (Python `unittest`) | The manifest and its checks (changed byte, truncated or missing file, malformed fields), retention of three builds, and `scripts/ci/deploy-shell.sh` and `publish-data.sh` against a fake AWS CLI: the shell deploy never writes under `data/`, the publish never writes outside it, the pointer is written last, a same-day build with other bytes is refused, a damaged upload leaves the old pointer. |
 | `test/feed/` | before a timetable build is published, and locally after `scripts/fetch-feed.sh` | The engine on the real national timetable: size and age of the window, named chains (Wolfsburg to Leipzig and München, München to Wolfsburg via Nürnberg, Wolfsburg to München via Leipzig), the Leipzig footpath, a train past midnight, station search. Days come from the data, bounds are generous ceilings. |
 

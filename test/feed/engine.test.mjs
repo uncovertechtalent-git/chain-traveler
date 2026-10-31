@@ -10,10 +10,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Timetable, fmt, INF } from '../../app/engine.js';
 
-const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', 'data');
+// The data directory is laid out as on the CDN: latest.json names the dated build next to it. CT_DATA_DIR overrides app/data.
+const dataDir = process.env.CT_DATA_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', 'data');
+const manifest = JSON.parse(fs.readFileSync(path.join(dataDir, 'latest.json'), 'utf8'));
+const dir = path.join(dataDir, manifest.date);
 const meta = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json'), 'utf8'));
 const raw = zlib.gunzipSync(fs.readFileSync(path.join(dir, 'timetable.bin.gz')));
 const tt = new Timetable(meta, raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength));
@@ -34,6 +38,15 @@ test('the feed is a usable window: stations, connections and days', () => {
   assert.ok(tt.nConn >= 1000000, 'connections ' + tt.nConn);
   assert.ok(tt.nDays >= 14, 'days ' + tt.nDays);
   assert.ok(meta.feed.sha256 && /^[0-9a-f]{64}$/.test(meta.feed.sha256), 'feed sha256 recorded');
+});
+
+test('the build matches its manifest byte for byte', () => {
+  const sha = f => crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, f))).digest('hex');
+  assert.equal(sha('timetable.bin.gz'), manifest.sha256);
+  assert.equal(sha('meta.json'), manifest.metaSha256);
+  assert.equal(fs.statSync(path.join(dir, 'timetable.bin.gz')).size, manifest.bytes);
+  assert.equal(manifest.firstDate, meta.firstDate);
+  assert.equal(manifest.nDays, meta.nDays);
 });
 
 test('the window starts no more than three days before today', () => {

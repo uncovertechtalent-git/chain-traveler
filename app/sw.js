@@ -1,24 +1,53 @@
-// Offline support. The timetable is cached on first load and served cache-first (it changes only when rebuilt).
-// The app shell is network-first with a cache fallback, so edits show up online and the app still opens offline.
-const CACHE = 'ct-v2';
-const SHELL = ['./', 'index.html', 'app.js', 'engine.js', 'style.css', 'manifest.webmanifest', 'icon.svg', 'data/meta.json', 'data/timetable.bin.gz'];
+// Service worker: keeps the app shell available offline and leaves the timetable to app/data-store.js.
+//
+// Shell (index.html, scripts, styles): every release has its own cache, filled completely at install, so the
+// offline shell is one release and never a mix. Requests are network-first: online you always get the newest file
+// (the CDN sends no-cache and the browser revalidates), offline you get the cached one. The version is a hash of the
+// shell files; scripts/ci/deploy-shell.sh replaces the placeholder below when it publishes. Run from a checkout, the
+// placeholder stays and one cache name is reused, which network-first makes harmless.
+//
+// Data: the verified timetable lives in Cache Storage under names the data store controls. This worker does not
+// cache it. Dated build files (data/<date>/...) are served cache-first if the store has them, data/latest.json is
+// never touched, so the update check always sees the live manifest.
+const VERSION = '__SHELL_VERSION__';
+const SHELL_CACHE = 'ct-shell-' + VERSION;
+const SHELL = ['./', 'index.html', 'app.js', 'engine.js', 'data-store.js', 'style.css', 'manifest.webmanifest', 'icon.svg'];
+const DATED_BUILD = /\/data\/\d{4}-\d{2}-\d{2}\//;
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
-});
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(
+    caches.open(SHELL_CACHE)
+      .then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
-const store = (req, res) => { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return res; };
+self.addEventListener('activate', e => {
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => (k.startsWith('ct-shell-') && k !== SHELL_CACHE) || k === 'ct-v2').map(k => caches.delete(k))))
+      .then(() => self.clients.claim()),
+  );
+});
 
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
-  const isData = new URL(req.url).pathname.includes('/data/');
-  if (isData) {
-    e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => store(req, res))));
-  } else {
-    e.respondWith(fetch(req).then(res => store(req, res)).catch(() => caches.match(req)));
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+
+  if (DATED_BUILD.test(url.pathname)) {
+    e.respondWith(caches.match(req).then(hit => hit || fetch(req)));
+    return;
   }
+  if (url.pathname.includes('/data/')) return;   // latest.json and anything else under data/: straight to the network
+
+  e.respondWith(
+    fetch(req)
+      .then(res => {
+        if (res.ok && res.type === 'basic') { const copy = res.clone(); caches.open(SHELL_CACHE).then(c => c.put(req, copy)); }
+        return res;
+      })
+      .catch(() => caches.match(req, { ignoreSearch: true }).then(hit => hit || (req.mode === 'navigate' ? caches.match('index.html') : Response.error()))),
+  );
 });

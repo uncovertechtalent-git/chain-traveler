@@ -19,6 +19,7 @@ on:
       - "app/**"
       - "scripts/ci/deploy-shell.sh"
       - "scripts/ci/aws-session.sh"
+      - "build/shell_version.py"
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
 

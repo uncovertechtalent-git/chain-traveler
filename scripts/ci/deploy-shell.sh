@@ -32,9 +32,10 @@ content_type() {
   esac
 }
 
-# The shell files: everything under the app directory except data/ and dot-directories other than .well-known.
+# The shell files: everything under the app directory except data/ (and macOS .DS_Store files).
 files="$(mktemp)"
-trap 'rm -f "$files"' EXIT
+stamped="$(mktemp)"
+trap 'rm -f "$files" "$stamped"' EXIT
 (cd "$src" && find . -type f ! -path './data/*' ! -name '.DS_Store' | sed 's|^\./||' | LC_ALL=C sort) > "$files"
 [ -s "$files" ] || { echo "no shell files found" >&2; exit 2; }
 
@@ -43,9 +44,14 @@ while IFS= read -r key; do
   content_type "$key" > /dev/null
 done < "$files"
 
+# The service worker is published with its cache version filled in: a hash of the other shell files.
+python3 -I "$(dirname "$0")/../../build/shell_version.py" stamp "$src" "$stamped"
+
 while IFS= read -r key; do
   ctype="$(content_type "$key")"
-  aws s3 cp "$src/$key" "s3://$bucket/$key" --only-show-errors --content-type "$ctype" --cache-control "no-cache"
+  from="$src/$key"
+  [ "$key" = "sw.js" ] && from="$stamped"
+  aws s3 cp "$from" "s3://$bucket/$key" --only-show-errors --content-type "$ctype" --cache-control "no-cache"
 done < "$files"
 
 # Remove shell files that the app no longer has. Keys under data/ are never listed for deletion.

@@ -60,3 +60,7 @@ canvas{display:block;width:100%;background:var(--bg);border:1px solid var(--line
 table{width:100%;border-collapse:collapse;font-size:.9rem}
 td,th{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:top}
 th{color:var(--muted);font-weight:500}
+
+.dataage{margin:0 0 14px;color:var(--muted);font-size:.85rem}
+.dataage[data-level="soon"]{color:var(--warn)}
+.dataage[data-level="expired"]{color:var(--warn);background:var(--warn-soft);padding:8px 10px;border-radius:8px;font-weight:600}
