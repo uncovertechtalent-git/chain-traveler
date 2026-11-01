@@ -205,6 +205,16 @@ class CutTest(Base):
         out, _ = self.delays([self.run_of('t3', stops)])
         self.assertEqual(out['trips'][DAY]['delay'], {'3': 2})
 
+    def test_with_no_stop_behind_it_the_run_gets_the_delay_of_the_departure_it_is_about_to_make(self):
+        # the train is predicted 10 minutes late into the stop and 8 late out of it: a leg that boards there leaves 8 late
+        stops = [stop(18, arr=(600, FEED_TIME + 600), dep=(480, FEED_TIME + 800)), stop(19, arr=(360, FEED_TIME + 1800))]
+        out, _ = self.delays([self.run_of('t3', stops)])
+        self.assertEqual(out['trips'][DAY]['delay'], {'3': 8})
+
+    def test_a_first_stop_with_an_arrival_only_gives_the_arrival_delay(self):
+        out, _ = self.delays([self.run_of('t3', [stop(9, arr=(180, FEED_TIME + 600))])])
+        self.assertEqual(out['trips'][DAY]['delay'], {'3': 3})
+
     def test_minutes_are_whole_and_rounded_half_up(self):
         for seconds, minutes in ((29, 0), (30, 1), (89, 1), (90, 2), (-29, 0), (-30, 0), (-31, -1), (-90, -1), (-91, -2), (0, 0), (3600, 60)):
             out, _ = self.delays([self.run_of('t3', [stop(0, dep=(seconds, FEED_TIME - 10))])])

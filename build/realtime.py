@@ -5,8 +5,9 @@ The stream (https://realtime.gtfs.de/realtime-free.pb, beta, CC BY-SA 4.0) is on
 10 seconds, with no CORS header: a browser cannot read it. This turns it into data/delays.json, a few tens of KB the
 app fetches from its own origin. Per run (a trip on one service day) it keeps
 
-  delay      the latest known delay, in whole minutes (negative: early). "Latest known" is the last stop whose time is not
-             after the stream's own timestamp; for a run that has not started, its first stop.
+  delay      the latest known delay, in whole minutes (negative: early). "Latest known" is the last stop event whose time is
+             not after the stream's own timestamp; when there is none (the stream drops the stops behind a train, so a run
+             on its way often has none), the first stop's departure, or its arrival if it has no departure there.
   cancelled  the run is CANCELED, or every one of its stops is SKIPPED (this is how the stream cancels a run in practice)
   skipped    how many stops of a run that still runs are SKIPPED
 
@@ -272,12 +273,10 @@ def _state(stops, feed_time):
     for _, rel, arr, dep in stops:
         if rel == STOP_SKIPPED:
             continue
+        if first is None:
+            first = dep[0] if dep[0] is not None else arr[0]
         for delay, at in (arr, dep):
-            if delay is None:
-                continue
-            if first is None:
-                first = delay
-            if at is not None and at <= feed_time:
+            if delay is not None and at is not None and at <= feed_time:
                 latest = delay
     chosen = latest if latest is not None else first
     return False, skipped, None if chosen is None else _minutes(chosen)
