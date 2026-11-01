@@ -30,7 +30,7 @@ test('index.html has no inline script, no inline style and no event handler attr
 });
 
 test('the scripts do not build markup with inline styles or handlers', () => {
-  for (const f of ['app.js', 'data-store.js', 'engine.js']) {
+  for (const f of ['app.js', 'data-store.js', 'engine.js', 'planb.js', 'graph.js', 'live.js']) {
     const js = read(f);
     assert.ok(!/style\s*=\s*["'\\]/.test(js.replace(/\.style\.[a-z]+\s*=/g, '')), f + ': style attribute in markup');
     assert.ok(!/\son(click|load|error|input|change)\s*=\s*["']/.test(js), f + ': handler attribute in markup');
@@ -47,7 +47,7 @@ test('every local file the page names exists', () => {
 });
 
 test('the app makes no network request except to its own files', () => {
-  for (const f of ['app.js', 'data-store.js', 'sw.js', 'engine.js']) {
+  for (const f of ['app.js', 'data-store.js', 'sw.js', 'engine.js', 'planb.js', 'graph.js', 'live.js']) {
     assert.ok(!/https?:\/\//.test(read(f).replace(/\/\/ .*$/gm, '')), f + ' names an absolute URL');
   }
 });

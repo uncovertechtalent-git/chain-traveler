@@ -64,3 +64,41 @@ th{color:var(--muted);font-weight:500}
 .dataage{margin:0 0 14px;color:var(--muted);font-size:.85rem}
 .dataage[data-level="soon"]{color:var(--warn)}
 .dataage[data-level="expired"]{color:var(--warn);background:var(--warn-soft);padding:8px 10px;border-radius:8px;font-weight:600}
+
+/* Plan B: good, late and much later against the plan. Colour is never the only carrier: every way also says it in words. */
+:root{--good:#1a7f4b;--mid:#b45309;--bad:#b3261e;--ghost:#8a877d}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--good:#4ad295;--mid:#f0b34a;--bad:#f27b6b;--ghost:#9a978d}}
+:root[data-theme="dark"]{--good:#4ad295;--mid:#f0b34a;--bad:#f27b6b;--ghost:#9a978d}
+.tabs{flex-wrap:wrap}
+@media (max-width:480px){.tabs{gap:4px}.tabs button{padding:7px 10px;font-size:.9rem}}
+button.out{min-height:26px;padding:1px 10px;font-size:.76rem;margin-left:4px;color:var(--bad);border-color:var(--bad);background:transparent}
+.lead{margin:0 0 12px}
+.lead2{margin:12px 0 8px;font-weight:600}
+#ldeps h3{font-size:.92rem;margin:14px 0 2px}
+.outs{list-style:none;margin:6px 0 0;padding:0}
+.outl{display:flex;flex-direction:row;align-items:center;gap:8px;font-size:.9rem;color:var(--text);padding:3px 0;cursor:pointer}
+.outl input{width:auto;min-height:0;margin:0}
+.pb{display:block;width:100%;height:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.pb .e{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.pb .e.good{stroke:var(--good)}.pb .e.mid{stroke:var(--mid)}.pb .e.bad{stroke:var(--bad)}
+.pb .e.walk{stroke-dasharray:6 6}
+.pb .e.ghost{stroke:var(--text);opacity:.7;stroke-width:2;stroke-dasharray:1 6}
+.pb .n{fill:var(--surface);stroke:var(--muted);stroke-width:2.5}
+.pb .n.good{stroke:var(--good)}.pb .n.mid{stroke:var(--mid)}.pb .n.bad{stroke:var(--bad)}
+.pb .n.src{fill:var(--start);stroke:var(--start)}
+.pb .n.dst{stroke-width:3.5}
+.pb .n.dst.good{fill:var(--good)}.pb .n.dst.mid{fill:var(--mid)}.pb .n.dst.bad{fill:var(--bad)}
+.pb text{font:12px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;fill:var(--text);paint-order:stroke;stroke:var(--bg);stroke-width:3px;stroke-linejoin:round}
+.pb .nm.key{font-weight:700}
+.pb .tm{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.legend2{color:var(--muted);font-size:.82rem;margin:8px 0 0}
+.chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:0 8px;font-size:.78rem;font-weight:600}
+.chip.good{color:var(--good);border-color:var(--good)}.chip.mid{color:var(--mid);border-color:var(--mid)}.chip.bad{color:var(--bad);border-color:var(--bad)}
+.tag{display:inline-block;font-size:.74rem;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:0 7px}
+.opts{list-style:none;margin:14px 0 0;padding:0}
+.opt{border:1px solid var(--line);border-left:6px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 10px}
+.opt.good{border-left-color:var(--good)}.opt.mid{border-left-color:var(--mid)}.opt.bad{border-left-color:var(--bad)}
+.opt .head{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.mini{list-style:none;margin:8px 0 0;padding:0;font-size:.88rem}
+.mini li{padding:2px 0}
+.mini li.walk{color:var(--muted)}

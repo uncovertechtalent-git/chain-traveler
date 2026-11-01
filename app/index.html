@@ -47,6 +47,7 @@
       <button role="tab" id="tab-chain" aria-selected="true">Chain</button>
       <button role="tab" id="tab-reach" aria-selected="false">Reach map</button>
       <button role="tab" id="tab-deps" aria-selected="false">Departures</button>
+      <button role="tab" id="tab-live" aria-selected="false">Plan B</button>
     </nav>
 
     <section id="pane-chain" class="card" role="tabpanel" aria-live="polite"></section>
@@ -70,6 +71,23 @@
         <label>After<input id="dtime" type="time" value="06:00"></label>
       </div>
       <div id="deplist"></div>
+    </section>
+
+    <section id="pane-live" class="card" role="tabpanel" hidden>
+      <p class="note lead">Your train is out? Say where you are and where you are going. You get the ways on from here, each set against your plan, and how many trains an hour stand behind every leg.</p>
+      <div class="controls">
+        <label class="wide">I am at
+          <span class="pick"><input id="lsrc" autocomplete="off" spellcheck="false" placeholder="Station"><ul class="sugg" hidden></ul></span>
+        </label>
+        <label>Date<select id="ldate"></select></label>
+        <label>Time now<input id="lt0" type="time"></label>
+        <label class="wide">Going to
+          <span class="pick"><input id="ldst" autocomplete="off" spellcheck="false" placeholder="Station"><ul class="sugg" hidden></ul></span>
+        </label>
+        <label>Planned arrival (optional)<input id="lplan" type="time"></label>
+      </div>
+      <div id="ldeps"></div>
+      <div id="lres" aria-live="polite"></div>
     </section>
   </main>
 

@@ -119,9 +119,13 @@ export class Timetable {
     return best;
   }
 
+  // A trip runs once per service day; a cancellation hits one run. Runs are keyed by service day and trip number.
+  tripKey(svcDay, trip) { return svcDay * this.nTrips + trip; }
+
   // ---- earliest arrival (connection scan) ----
-  // opts: { day, src, t0, minTransfer, target, dayEnd }  t0 in minutes after midnight of `day` (may exceed 1440)
-  earliestArrival({ day, src, t0, minTransfer = 4, target = -1 }) {
+  // opts: { day, src, t0, minTransfer, target, exclude }  t0 in minutes after midnight of `day` (may exceed 1440).
+  // exclude: a Set of tripKey() values, runs that do not happen (a cancelled train). The scan never boards them.
+  earliestArrival({ day, src, t0, minTransfer = 4, target = -1, exclude = null }) {
     const n = this.nStations, nT = this.nTrips;
     const arr = new Int32Array(n).fill(INF);
     const inC = new Int32Array(n).fill(-1);
@@ -152,6 +156,7 @@ export class Timetable {
       const ci = p[best]++;
       const trip = connTrip[ci];
       if (!((tripSvc[trip] >>> days[best]) & 1)) continue;
+      if (exclude && exclude.has(days[best] * nT + trip)) continue;
       const key = best * nT + trip;
       let on = tripBoard[key] >= 0;
       const f = connFrom[ci];
@@ -186,7 +191,7 @@ export class Timetable {
       const b = res.tripBoard[layer * this.nTrips + trip];
       const bci = decCi(b);
       legs.push({
-        walk: false, trip, line: this.lines[this.tripLine[trip]], term: this.tripTerm[trip],
+        walk: false, trip, svcDay: res.day + LAYERS[layer], line: this.lines[this.tripLine[trip]], term: this.tripTerm[trip],
         from: this.connFrom[bci], to: this.connTo[ci],
         dep: this.connDep[bci] + OFFS[layer], arr: this.connArr[ci] + OFFS[layer],
       });
@@ -225,12 +230,58 @@ export class Timetable {
         const ci = this.stConn[i], trip = this.connTrip[ci];
         if (!((this.tripSvc[trip] >>> d) & 1) || !(this.connFlags[ci] & 1)) continue;
         out.push({ dep: this.connDep[ci] + OFFS[k], arr: this.connArr[ci] + OFFS[k], next: this.connTo[ci],
-          line: this.lines[this.tripLine[trip]], term: this.tripTerm[trip], trip });
+          line: this.lines[this.tripLine[trip]], term: this.tripTerm[trip], trip, svcDay: d });
         found++;
       }
     }
     out.sort((a, b) => a.dep - b.dep);
     return out.slice(0, limit);
+  }
+
+  // The connection that follows each connection on the same trip, or -1 at the end of the trip. Built on first use.
+  get nextOnTrip() {
+    if (!this._nextOnTrip) {
+      const next = new Int32Array(this.nConn).fill(-1);
+      const last = new Int32Array(this.nTrips).fill(-1);
+      for (let ci = 0; ci < this.nConn; ci++) {
+        const t = this.connTrip[ci];
+        if (last[t] >= 0) next[last[t]] = ci;
+        last[t] = ci;
+      }
+      this._nextOnTrip = next;
+    }
+    return this._nextOnTrip;
+  }
+
+  // The time the trip of connection `ci` arrives at `station`, riding on from the departure of `ci`, or -1 if it never
+  // calls there (or does not let you alight there).
+  callsAt(ci, station) {
+    const next = this.nextOnTrip;
+    for (let c = ci; c >= 0; c = next[c]) {
+      if (this.connTo[c] === station && (this.connFlags[c] & 2)) return this.connArr[c];
+    }
+    return -1;
+  }
+
+  // Trains that serve the link from -> to: runs boardable at `from` between t - before and t + after (minutes after
+  // midnight of `day`) that call at `to` further on. With a 60 minute window this is "trains an hour".
+  callsPerWindow({ day, from, to, t, before = 30, after = 30, exclude = null }) {
+    const lo = this.stStart[from], hi = this.stStart[from + 1];
+    let n = 0;
+    for (let k = 0; k < LAYERS.length; k++) {
+      const d = day + LAYERS[k];
+      if (d < 0 || d >= this.nDays) continue;
+      const end = t + after - OFFS[k];
+      for (let i = lowerBoundIdx(this.stConn, this.connDep, lo, hi, t - before - OFFS[k]); i < hi; i++) {
+        const ci = this.stConn[i];
+        if (this.connDep[ci] >= end) break;
+        const trip = this.connTrip[ci];
+        if (!((this.tripSvc[trip] >>> d) & 1) || !(this.connFlags[ci] & 1)) continue;
+        if (exclude && exclude.has(d * this.nTrips + trip)) continue;
+        if (this.callsAt(ci, to) >= 0) n++;
+      }
+    }
+    return n;
   }
 }
 
