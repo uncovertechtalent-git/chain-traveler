@@ -18,6 +18,7 @@ sys.path.insert(0, HERE)
 from test_manifest import write_build  # noqa: E402
 
 BUCKET = 'test-bucket'
+SW = "const VERSION = '__SHELL_VERSION__';\n"
 
 
 class ScriptTest(unittest.TestCase):
@@ -88,7 +89,7 @@ class ScriptTest(unittest.TestCase):
         return self.run_script(os.path.join(ROOT, 'scripts', 'ci', 'deploy-shell.sh'), app, BUCKET, 'DIST1', **env)
 
     def test_shell_deploy_publishes_the_shell_and_never_touches_data(self):
-        app = self.make_app({'index.html': '<!doctype html>', 'sw.js': '//', 'app.js': '//', 'style.css': 'x{}',
+        app = self.make_app({'index.html': '<!doctype html>', 'sw.js': SW, 'app.js': '//', 'style.css': 'x{}',
                              'manifest.webmanifest': '{}', 'icon.svg': '<svg/>', '.well-known/assetlinks.json': '[]',
                              'data/meta.json': '{"local":"build output must not ship"}'})
         os.makedirs(os.path.join(self.s3, BUCKET, 'data', '2026-10-31'))
@@ -113,13 +114,29 @@ class ScriptTest(unittest.TestCase):
         self.assertFalse([p for p in inval['paths'] if p.startswith('/data')])
         self.assertTrue([c for c in self.calls() if c['op'] == 'delete' and c['key'] == 'old-page.html'])
 
+    def test_shell_deploy_stamps_the_service_worker_with_a_hash_of_the_shell(self):
+        files = {'index.html': 'one', 'sw.js': SW, 'app.js': 'a'}
+        self.assertEqual(self.deploy(self.make_app(files)).returncode, 0)
+        first = self.read('sw.js').decode()
+        self.assertNotIn('__SHELL_VERSION__', first)
+        self.assertRegex(first, r"const VERSION = '[0-9a-f]{12}';")
+        self.assertEqual(self.deploy(self.make_app(files)).returncode, 0)
+        self.assertEqual(self.read('sw.js').decode(), first, 'the same shell gives the same version')
+        self.assertEqual(self.deploy(self.make_app(dict(files, **{'app.js': 'b'}))).returncode, 0)
+        self.assertNotEqual(self.read('sw.js').decode(), first, 'a changed shell file gives a new version')
+
+    def test_shell_deploy_refuses_a_service_worker_without_the_placeholder(self):
+        r = self.deploy(self.make_app({'index.html': 'x', 'sw.js': '// no placeholder'}))
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual([c for c in self.calls() if c['op'] == 'put'], [])
+
     def test_shell_deploy_refuses_an_app_without_a_service_worker(self):
         r = self.deploy(self.make_app({'index.html': 'x'}))
         self.assertEqual(r.returncode, 2)
         self.assertEqual(self.calls(), [])
 
     def test_shell_deploy_refuses_a_file_of_unknown_type(self):
-        r = self.deploy(self.make_app({'index.html': 'x', 'sw.js': 'x', 'notes.bin': 'x'}))
+        r = self.deploy(self.make_app({'index.html': 'x', 'sw.js': SW, 'notes.bin': 'x'}))
         self.assertNotEqual(r.returncode, 0)
         self.assertIn('unknown file type', r.stderr)
         self.assertEqual([c for c in self.calls() if c['op'] == 'put'], [], 'nothing is uploaded before every type is known')

@@ -1,27 +1,17 @@
 import { Timetable, fmt, dur, INF } from './engine.js';
+import { DataStore, gunzip, describeAge } from './data-store.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const toMin = v => { const [h, m] = (v || '06:00').split(':').map(Number); return h * 60 + m; };
 
 const DEFAULTS = { date: '', src: '', dst: '', via: '', t0: '06:00', stay: 180, tr: 4 };
-let tt, state, lastPlan = null, reachCache = null;
+let tt, state, store, manifest, uiReady = false, lastCheck = 0, lastPlan = null, reachCache = null;
 
 function loadState() {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('ct-state') || '{}') }; } catch { return { ...DEFAULTS }; }
 }
 function saveState() { try { localStorage.setItem('ct-state', JSON.stringify(state)); } catch { /* storage unavailable */ } }
-
-async function loadGz(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(url + ' ' + res.status);
-  let buf = await res.arrayBuffer();
-  const b = new Uint8Array(buf);
-  if (b[0] === 0x1f && b[1] === 0x8b) {
-    buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
-  }
-  return buf;
-}
 
 // ---- station picker ----
 function picker(input, onPick) {
@@ -218,31 +208,88 @@ function showTab(name) {
   if (name === 'deps') { if (pDep.get() < 0) pDep.set(pSrc.get()); drawDeps(); }
 }
 
-async function start() {
-  const status = $('#status');
-  try {
-    const [meta, buf] = await Promise.all([fetch('data/meta.json').then(r => r.json()), loadGz('data/timetable.bin.gz')]);
-    tt = new Timetable(meta, buf);
-  } catch (e) {
-    status.textContent = 'The timetable could not be loaded: ' + e.message + '. Build it first (see README).';
-    return;
-  }
-  state = loadState();
+// ---- timetable data: load from the device, update in the background ----
+const berlinToday = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
+const SIX_HOURS = 6 * 3600 * 1000;
+
+function showAge(note) {
+  const el = $('#dataage');
+  const a = describeAge(manifest, berlinToday());
+  el.textContent = note ? `${a.text} ${note}` : a.text;
+  el.dataset.level = a.level;
+  el.hidden = false;
+}
+
+function fillDates(wantedIso) {
   const sel = $('#date');
+  sel.innerHTML = '';
   for (let d = 0; d < tt.nDays; d++) {
     const iso = tt.dateOf(d);
     const label = new Date(iso + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
     sel.add(new Option(label, d));
   }
-  const today = new Date().toISOString().slice(0, 10);
-  const wanted = state.date && tt.dayIndex(state.date) >= 0 && tt.dayIndex(state.date) < tt.nDays ? state.date : (tt.dayIndex(today) >= 0 && tt.dayIndex(today) < tt.nDays ? today : tt.dateOf(0));
-  sel.value = tt.dayIndex(wanted);
+  const inWindow = iso => iso && tt.dayIndex(iso) >= 0 && tt.dayIndex(iso) < tt.nDays;
+  const today = berlinToday();
+  sel.value = tt.dayIndex(inWindow(wantedIso) ? wantedIso : (inWindow(today) ? today : tt.dateOf(0)));
+}
 
+// Use a build: the first one at launch, and every update after it. Station numbers differ between builds, so
+// the picked stations and the day are carried over by name and date.
+function adopt(cur, next) {
+  const keep = uiReady
+    ? { iso: tt.dateOf(+$('#date').value), src: $('#src').value, dst: $('#dst').value, via: $('#via').value, dep: $('#dstation').value }
+    : { iso: state.date, src: state.src, dst: state.dst, via: state.via, dep: '' };
+  tt = next;
+  manifest = cur.manifest;
+  reachCache = null;
+  lastPlan = null;
+  fillDates(keep.iso);
+  if (!uiReady) initUi();
+  pSrc.set(tt.find(keep.src)); pDst.set(tt.find(keep.dst)); pVia.set(keep.via ? tt.find(keep.via) : -1); pDep.set(keep.dep ? tt.find(keep.dep) : -1);
+  const f = tt.meta.feed;
+  $('#foot').textContent = `Timetable: ${f.publisher}, ${f.license}. ${tt.nStations.toLocaleString('en')} stations, ${tt.nConn.toLocaleString('en')} connections, ${tt.dateOf(0)} to ${tt.dateOf(tt.nDays - 1)}. Planned times only, no delays or engineering works. Check the trip in DB Navigator before you travel.`;
+  $('#status').hidden = true;
+  $('#retry').hidden = true;
+  $('#app').hidden = false;
+  showAge('');
+  runPlan();
+  if (!$('#pane-deps').hidden) drawDeps();
+}
+
+async function useBuild(cur) {
+  adopt(cur, new Timetable(cur.meta, await gunzip(cur.bin)));
+}
+
+// On an online launch, and when the device comes back online or the app is reopened after hours: ask the CDN
+// whether a newer build exists, and swap it in only after it has been verified (app/data-store.js).
+async function checkForUpdate() {
+  if (navigator.onLine === false) { if (manifest) showAge('Offline: using the timetable on this device.'); return; }
+  lastCheck = Date.now();
+  try {
+    const r = await store.update();
+    if (r.status === 'updated') {
+      const cur = await store.load();
+      if (cur) { await useBuild(cur); showAge('Updated just now.'); }
+    } else if (manifest) {
+      showAge('Up to date.');
+    }
+  } catch (e) {
+    if (!manifest) {
+      $('#status').hidden = false;
+      $('#status').textContent = `The timetable could not be loaded (${e.message}). The first launch needs an internet connection.`;
+      $('#retry').hidden = false;
+    } else {
+      showAge(`Could not check for a newer timetable (${e.code || 'error'}); the data on this device is unchanged.`);
+    }
+  }
+}
+
+function initUi() {
+  uiReady = true;
   pSrc = picker($('#src'), () => runPlan());
   pDst = picker($('#dst'), () => runPlan());
   pVia = picker($('#via'), () => runPlan());
   pDep = picker($('#dstation'), () => drawDeps());
-  pSrc.set(tt.find(state.src)); pDst.set(tt.find(state.dst)); pVia.set(state.via ? tt.find(state.via) : -1);
   $('#t0').value = state.t0; $('#stay').value = state.stay; $('#tr').value = state.tr;
   $('#dtime').value = state.t0;
 
@@ -272,13 +319,26 @@ async function start() {
     if (!p) return;
     pDst.set(p[2]); showTab('chain'); runPlan();
   });
+}
 
-  const f = tt.meta.feed;
-  $('#foot').textContent = `Timetable: ${f.publisher}, ${f.license}. ${tt.nStations.toLocaleString('en')} stations, ${tt.nConn.toLocaleString('en')} connections, ${tt.dateOf(0)} to ${tt.dateOf(tt.nDays - 1)}. Planned times only, no delays or engineering works. Check the trip in DB Navigator before you travel.`;
-  status.textContent = `Ready: ${tt.nStations.toLocaleString('en')} stations, ${tt.dateOf(0)} to ${tt.dateOf(tt.nDays - 1)}.`;
-  $('#app').hidden = false;
-  runPlan();
+async function start() {
+  const status = $('#status');
+  state = loadState();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (!('caches' in self) || !(crypto && crypto.subtle)) {
+    status.textContent = 'This browser cannot keep the timetable on the device (it needs Cache Storage over HTTPS). Try a current browser.';
+    return;
+  }
+  store = new DataStore({ caches: self.caches, fetch: (u, i) => fetch(u, i), subtle: crypto.subtle, base: new URL('./', location.href).href });
+  $('#retry').onclick = () => { status.textContent = 'Loading the timetable...'; $('#retry').hidden = true; checkForUpdate(); };
+  window.addEventListener('online', checkForUpdate);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastCheck > SIX_HOURS) checkForUpdate(); });
+
+  let cur = null;
+  try { cur = await store.load(); } catch (e) { status.textContent = 'The stored timetable could not be read: ' + e.message; }
+  if (cur) await useBuild(cur);
+  else status.textContent = 'Loading the timetable for the first time (about 5 MB)...';
+  await checkForUpdate();
 }
 
 start();
