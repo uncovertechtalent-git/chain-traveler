@@ -4,9 +4,10 @@ name: CI
 # the timetable build have their own workflows. Every action is pinned to a commit SHA (Dependabot moves
 # the SHA and the version comment together); the one Python tool, zizmor, is pinned with wheel hashes.
 
+# No branch filter on pull_request: a pull request stacked on another branch is checked too, and its checks
+# stay valid for the same commit when it is retargeted to main after the base merges.
 on:
   pull_request:
-    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
@@ -41,6 +42,9 @@ jobs:
       - name: Syntax check of the app files
         run: |
           for f in app/*.js; do node --check "$f"; done
+
+      - name: Build and script tests (manifest, retention, deploy and publish scripts against a fake AWS CLI)
+        run: python3 -I -m unittest discover -s test/build -v
 
   scripts:
     name: Scripts and workflows

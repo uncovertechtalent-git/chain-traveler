@@ -1,0 +1,154 @@
+name: Timetable
+
+# Builds the national regional timetable from the gtfs.de feed every day and publishes it to the CDN, so a
+# data update never waits on an app release or a store review. Two jobs, so that the one that handles
+# third-party data never holds a cloud credential:
+#
+#   build    fetch the feed, build the binary timetable, run the feed tests (the gate), write the manifest.
+#            No AWS access, no id-token.
+#   publish  verify the artifact against its manifest, upload data/<date>/ (immutable), read it back, then
+#            write data/latest.json, then delete all but the newest three builds. Keyless: a 15-minute
+#            session of a role that trusts this repository's main branch and may write data/* of one bucket.
+#
+# `publish` is skipped until the repository variable S3_DEPLOY is "on"; `build` then still runs as a dry run
+# and keeps its artifact for seven days. A manual run can instead point latest.json back at a kept build
+# (input rollback_to), which is the data rollback.
+#
+# The feed is regenerated around 09:40 UTC; the schedule leaves margin. The run is idempotent: when the feed
+# behind the current latest.json is the feed of this build, publish does nothing.
+# Secrets (repository): AWS_DATA_ROLE_ARN, SITE_BUCKET.
+
+on:
+  schedule:
+    - cron: "17 11 * * *"
+  workflow_dispatch:
+    inputs:
+      rollback_to:
+        description: "Instead of building, point data/latest.json at this kept build (YYYY-MM-DD)"
+        required: false
+        default: ""
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: timetable
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify the timetable
+    if: inputs.rollback_to == ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+
+      - name: Fetch the gtfs.de feed and build the timetable
+        run: scripts/fetch-feed.sh "$RUNNER_TEMP/feed" app/data
+
+      - name: Feed tests (the gate before anything is published)
+        run: npm run test:feed
+
+      - name: Write the manifest and the immutable build directory
+        run: python3 -I build/manifest.py make app/data dist-data
+
+      - name: Upload the build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: timetable-build
+          path: dist-data
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Job summary
+        run: |
+          python3 -I - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          m = json.load(open('dist-data/data/latest.json'))
+          print('### Timetable build')
+          print()
+          print('| | |')
+          print('|---|---|')
+          print('| Build | `%s` |' % m['date'])
+          print('| Window | %s, %d days |' % (m['firstDate'], m['nDays']))
+          print('| timetable.bin.gz | %.2f MB, sha256 `%s` |' % (m['bytes'] / 1e6, m['sha256'][:12]))
+          print('| meta.json | %.2f MB, sha256 `%s` |' % (m['metaBytes'] / 1e6, m['metaSha256'][:12]))
+          print('| gtfs.de feed | sha256 `%s` |' % m['feedSha256'][:12])
+          print('| Built | %s |' % m['built'])
+          print()
+          print('Feed tests passed. Data: gtfs.de, data provided by DELFI e.V., CC BY 4.0.')
+          PY
+
+  publish:
+    name: Publish to S3
+    needs: build
+    if: github.ref == 'refs/heads/main' && vars.S3_DEPLOY == 'on'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write   # the OIDC token the data role trusts (main branch claim)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: timetable-build
+          path: dist-data
+
+      - name: Verify, upload, read back, point latest.json at the build, prune
+        shell: bash  # adds -o pipefail: a failed token request stops here
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_DATA_ROLE_ARN }}
+          SITE_BUCKET: ${{ secrets.SITE_BUCKET }}
+          AWS_REGION: eu-central-1
+        run: |
+          . scripts/ci/aws-session.sh
+          aws_session "$AWS_ROLE_ARN" chain-traveler-data 900
+          scripts/ci/publish-data.sh publish dist-data "$SITE_BUCKET"
+
+  rollback:
+    name: Point latest.json at a kept build
+    if: inputs.rollback_to != '' && github.ref == 'refs/heads/main' && vars.S3_DEPLOY == 'on'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write   # the OIDC token the data role trusts (main branch claim)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify the kept build and rewrite the pointer
+        shell: bash
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_DATA_ROLE_ARN }}
+          SITE_BUCKET: ${{ secrets.SITE_BUCKET }}
+          ROLLBACK_TO: ${{ inputs.rollback_to }}
+          AWS_REGION: eu-central-1
+        run: |
+          . scripts/ci/aws-session.sh
+          aws_session "$AWS_ROLE_ARN" chain-traveler-data 900
+          scripts/ci/publish-data.sh rollback "$ROLLBACK_TO" "$SITE_BUCKET"
