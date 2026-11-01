@@ -27,7 +27,9 @@ export const raw = html => new Raw(html);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export const lang = () => code;
-export const num = (n, opts) => new Intl.NumberFormat(code, opts).format(n);
+// The tag for Intl: English is the British form (4 Nov, 24-hour), as the app has always shown it.
+const tag = () => (code === 'en' ? 'en-GB' : code);
+export const num = (n, opts) => new Intl.NumberFormat(tag(), opts).format(n);
 
 function fill(key, params, escape) {
   let v = dict[key] ?? en[key];
@@ -53,7 +55,7 @@ export const dur = m => (m >= 60 ? `${Math.floor(m / 60)} ${t('unit.h')} ${Strin
 export const dist = km => (km < 1
   ? t('unit.m', { n: Math.max(10, Math.round(km * 100) * 10) })
   : t('unit.km', { n: num(km, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }));
-export const dayLabel = iso => new Date(iso + 'T12:00:00Z').toLocaleDateString(code, { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+export const dayLabel = iso => new Date(iso + 'T12:00:00Z').toLocaleDateString(tag(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 
 // The fixed text of the page: [data-i18n] text, [data-i18n-ph] placeholder, [data-i18n-aria] aria-label.
 export function applyStatic(root = document) {
