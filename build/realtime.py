@@ -71,7 +71,6 @@ DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 SHA_RE = re.compile(r'^[0-9a-f]{64}$')
 STAMP_RE = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
 NUM_RE = re.compile(r'^\d{1,9}$')
-BERLIN = ZoneInfo('Europe/Berlin')
 
 
 class NothingToPublish(Exception):
@@ -238,7 +237,7 @@ def load_trip_ids(path, manifest):
 def day_start(iso):
     """Unix seconds of time zero of a service day: GTFS times count from noon minus 12 hours, local time."""
     y, m, d = (int(x) for x in iso.split('-'))
-    return int(dt.datetime(y, m, d, 12, tzinfo=BERLIN).timestamp()) - 12 * 3600
+    return int(dt.datetime(y, m, d, 12, tzinfo=ZoneInfo('Europe/Berlin')).timestamp()) - 12 * 3600
 
 
 def iso_day(start_date):

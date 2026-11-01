@@ -23,7 +23,7 @@ FEED = {
     # B7 and A3 run; Z9 has one stop only; N0 runs on no day
     'trips.txt': 'route_id,service_id,trip_id\nR1,daily,B7\nR1,daily,Z9\nR2,daily,A3\nR2,never,N0\n',
     'stop_times.txt': 'trip_id,arrival_time,departure_time,stop_id,stop_sequence\n'
-                      'B7,06:00:00,06:00:30,S1,0\nB7,07:00:00,07:02:00,S2,1\nB7,08:00:00,08:00:00,S3,2\n'
+                      'B7,05:58:00,06:00:30,S1,0\nB7,07:00:00,07:02:00,S2,1\nB7,08:00:00,08:00:00,S3,2\n'
                       'Z9,09:00:00,09:00:00,S1,0\n'
                       'A3,25:10:00,25:10:00,S2,0\nA3,25:40:00,25:40:00,S3,1\n'
                       'N0,10:00:00,10:00:00,S1,0\nN0,11:00:00,11:00:00,S2,1\n',
@@ -110,6 +110,14 @@ class BuildTest(unittest.TestCase):
             build_timetable.trip_ids_file(['a\tb'], [0])
         with self.assertRaises(SystemExit):
             build_timetable.trip_ids_file(['a\nb'], [0])
+
+    def test_the_file_does_not_depend_on_the_clock(self):
+        from unittest import mock
+        with mock.patch('time.time', return_value=1000.0):
+            a = build_timetable.trip_ids_file(['x', 'y'], [1, 2])
+        with mock.patch('time.time', return_value=2000.0):
+            b = build_timetable.trip_ids_file(['x', 'y'], [1, 2])
+        self.assertEqual(a, b)
 
     def test_a_first_stop_without_a_time_leaves_the_minute_empty(self):
         raw = gzip.decompress(build_timetable.trip_ids_file(['x', 'y'], [None, 5])).decode()
