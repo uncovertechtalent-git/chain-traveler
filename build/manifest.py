@@ -13,8 +13,13 @@ Usage:
   manifest.py make <built-dir> <out-dir> [--date YYYY-MM-DD]   write <out-dir>/data/<date>/ and <out-dir>/data/latest.json
   manifest.py feed-date <headers.txt>                          print the UTC date of the feed's Last-Modified header (nothing if there is none)
   manifest.py check <build-dir> <latest.json>                  verify a build directory against a manifest
+  manifest.py kid-of <base64-spki>                             print the key id (8 hex) of a public key
+  manifest.py set-kid <latest.json> <kid>                      put the key id into the manifest (before it is signed)
+  manifest.py canonical <latest.json>                          write the bytes that are signed to stdout
+  manifest.py attach-sig <latest.json> <base64-der-signature>  put the signature (raw r|s, base64) into the manifest
   manifest.py prune <keep> <date> [<date> ...]                 print the dates to delete, oldest first, keeping the newest <keep>
 """
+import base64
 import datetime
 import email.utils
 import hashlib
@@ -28,6 +33,7 @@ FORMAT = 1
 BUILD_FILES = ('timetable.bin.gz', 'meta.json')
 DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 SHA_RE = re.compile(r'^[0-9a-f]{64}$')
+KID_RE = re.compile(r'^[0-9a-f]{8}$')
 MAGIC = b'CHT1'
 
 
@@ -81,6 +87,15 @@ def validate_manifest(m):
             raise ValueError('%s must be a positive integer' % k)
     if not isinstance(m.get('built'), str):
         raise ValueError('built must be a timestamp string')
+    if 'kid' in m and (not isinstance(m['kid'], str) or not KID_RE.match(m['kid'])):
+        raise ValueError('kid must be 8 lowercase hex characters')
+    if 'sig' in m:
+        try:
+            ok = isinstance(m['sig'], str) and len(base64.b64decode(m['sig'], validate=True)) == 64
+        except ValueError:
+            ok = False
+        if not ok:
+            raise ValueError('sig must be base64 of a 64-byte ECDSA P-256 signature (r|s)')
 
 
 def check_build(build_dir, manifest):
@@ -128,6 +143,53 @@ def feed_date(headers_text):
     return found
 
 
+# ---- signature
+#
+# The manifest may carry a signature so that an app that holds the public key accepts a timetable only from whoever can
+# use the private key (an AWS KMS key that only the data role may use), not from whoever can write the bucket. The
+# signed bytes are the manifest without `sig`, keys sorted, no spaces: every field is ASCII text or an integer, so
+# the browser's JSON.stringify of the same object gives the same bytes (a test holds both to one golden manifest).
+# ECDSA P-256 with SHA-256; KMS returns the signature as DER, the browser's WebCrypto takes r|s (64 bytes).
+
+def canonical(manifest):
+    """The bytes that are signed."""
+    body = {k: v for k, v in manifest.items() if k != 'sig'}
+    return json.dumps(body, sort_keys=True, separators=(',', ':')).encode('ascii')
+
+
+def der_to_raw(der):
+    """An ECDSA signature as DER (SEQUENCE of two INTEGERs) to r|s, 32 bytes each."""
+    def read_len(b, i):
+        n = b[i]
+        if n < 0x80:
+            return n, i + 1
+        k = n & 0x7f
+        return int.from_bytes(b[i + 1:i + 1 + k], 'big'), i + 1 + k
+
+    def read_int(b, i):
+        if b[i] != 0x02:
+            raise ValueError('not a DER signature')
+        n, i = read_len(b, i + 1)
+        v = int.from_bytes(b[i:i + n], 'big')
+        return v, i + n
+
+    if len(der) < 8 or der[0] != 0x30:
+        raise ValueError('not a DER signature')
+    n, i = read_len(der, 1)
+    if i + n != len(der):
+        raise ValueError('not a DER signature')
+    r, i = read_int(der, i)
+    s, i = read_int(der, i)
+    if i != len(der) or not (0 < r < 1 << 256 and 0 < s < 1 << 256):
+        raise ValueError('not a P-256 signature')
+    return r.to_bytes(32, 'big') + s.to_bytes(32, 'big')
+
+
+def key_id(spki_der):
+    """Short id of a public key: the first 8 hex characters of the sha256 of its SubjectPublicKeyInfo."""
+    return hashlib.sha256(spki_der).hexdigest()[:8]
+
+
 def write_json(path, obj):
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(obj, f, separators=(',', ':'))
@@ -161,6 +223,44 @@ def cmd_feed_date(args):
         print(d)
 
 
+def _load(path):
+    with open(path, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def cmd_kid_of(args):
+    if len(args) != 1:
+        raise SystemExit(__doc__)
+    print(key_id(base64.b64decode(args[0], validate=True)))
+
+
+def cmd_set_kid(args):
+    if len(args) != 2:
+        raise SystemExit(__doc__)
+    m = _load(args[0])
+    m['kid'] = args[1]
+    m.pop('sig', None)
+    validate_manifest(m)
+    write_json(args[0], m)
+
+
+def cmd_canonical(args):
+    if len(args) != 1:
+        raise SystemExit(__doc__)
+    sys.stdout.buffer.write(canonical(_load(args[0])))
+
+
+def cmd_attach_sig(args):
+    if len(args) != 2:
+        raise SystemExit(__doc__)
+    m = _load(args[0])
+    if 'kid' not in m:
+        raise ValueError('set the key id before the signature: the signature covers it')
+    m['sig'] = base64.b64encode(der_to_raw(base64.b64decode(args[1], validate=True))).decode('ascii')
+    validate_manifest(m)
+    write_json(args[0], m)
+
+
 def cmd_check(args):
     if len(args) != 2:
         raise SystemExit(__doc__)
@@ -177,10 +277,10 @@ def cmd_prune(args):
 
 
 def main(argv):
-    if len(argv) < 2 or argv[1] not in ('make', 'check', 'prune', 'feed-date'):
+    if len(argv) < 2 or argv[1] not in ('make', 'check', 'prune', 'feed-date', 'kid-of', 'set-kid', 'canonical', 'attach-sig'):
         raise SystemExit(__doc__)
     try:
-        {'make': cmd_make, 'check': cmd_check, 'prune': cmd_prune, 'feed-date': cmd_feed_date}[argv[1]](argv[2:])
+        {'make': cmd_make, 'check': cmd_check, 'prune': cmd_prune, 'feed-date': cmd_feed_date, 'kid-of': cmd_kid_of, 'set-kid': cmd_set_kid, 'canonical': cmd_canonical, 'attach-sig': cmd_attach_sig}[argv[1]](argv[2:])
     except (ValueError, KeyError, OSError) as e:
         print('error: %s' % e, file=sys.stderr)
         return 1

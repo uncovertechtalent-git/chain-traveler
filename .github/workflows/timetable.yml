@@ -16,7 +16,8 @@ name: Timetable
 #
 # The feed is regenerated around 09:40 UTC; the schedule leaves margin. The run is idempotent: when the feed
 # behind the current latest.json is the feed of this build, publish does nothing.
-# Secrets (repository): AWS_DATA_ROLE_ARN, SITE_BUCKET.
+# Secrets (repository): AWS_DATA_ROLE_ARN, SITE_BUCKET, and SIGNING_KEY_ARN once the manifest signing key exists (site-infra);
+# without it the manifest is published unsigned, as before.
 
 on:
   schedule:
@@ -120,6 +121,7 @@ jobs:
         env:
           AWS_ROLE_ARN: ${{ secrets.AWS_DATA_ROLE_ARN }}
           SITE_BUCKET: ${{ secrets.SITE_BUCKET }}
+          SIGNING_KEY_ARN: ${{ secrets.SIGNING_KEY_ARN }}
           AWS_REGION: eu-central-1
         run: |
           . scripts/ci/aws-session.sh
@@ -145,6 +147,7 @@ jobs:
         env:
           AWS_ROLE_ARN: ${{ secrets.AWS_DATA_ROLE_ARN }}
           SITE_BUCKET: ${{ secrets.SITE_BUCKET }}
+          SIGNING_KEY_ARN: ${{ secrets.SIGNING_KEY_ARN }}
           ROLLBACK_TO: ${{ inputs.rollback_to }}
           AWS_REGION: eu-central-1
         run: |
