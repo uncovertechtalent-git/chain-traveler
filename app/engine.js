@@ -216,18 +216,18 @@ export class Timetable {
 
   // Plan src -> dst, optionally with a stop-over of at least stayMin minutes at `via`.
   plan({ day, src, dst, t0, via = -1, stayMin = 180, minTransfer = 4 }) {
-    if (src === dst) return { error: 'Start and target are the same station.' };
+    if (src === dst) return { error: 'Start and target are the same station.', code: 'sameStation' };
     if (via >= 0 && via !== src && via !== dst) {
       const r1 = this.earliestArrival({ day, src, t0, minTransfer, target: via });
-      if (r1.arr[via] >= INF) return { error: 'The stop-over cannot be reached after the start time.' };
+      if (r1.arr[via] >= INF) return { error: 'The stop-over cannot be reached after the start time.', code: 'viaUnreachable' };
       const tv = r1.arr[via];
       const r2 = this.earliestArrival({ day, src: via, t0: tv + stayMin, minTransfer, target: dst });
-      if (r2.arr[dst] >= INF) return { error: 'No onward connection after the stay; try a shorter stay or an earlier start.' };
+      if (r2.arr[dst] >= INF) return { error: 'No onward connection after the stay; try a shorter stay or an earlier start.', code: 'noOnward' };
       const legs1 = this.legsTo(r1, via), legs2 = this.legsTo(r2, dst);
       return { legs: [...legs1, ...legs2], stays: [{ station: via, arr: tv, dep: legs2[0].dep }], reach: r1 };
     }
     const r = this.earliestArrival({ day, src, t0, minTransfer, target: dst });
-    if (r.arr[dst] >= INF) return { error: 'No connection that day after the start time.' };
+    if (r.arr[dst] >= INF) return { error: 'No connection that day after the start time.', code: 'noConnection' };
     return { legs: this.legsTo(r, dst), stays: [], reach: r };
   }
 

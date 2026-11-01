@@ -105,3 +105,6 @@ button.out{min-height:26px;padding:1px 10px;font-size:.76rem;margin-left:4px;col
 .where{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:12px 0 0}
 .where .note{margin:0;flex:1 1 240px}
 button.near{min-height:30px;padding:2px 10px;font-size:.85rem;margin:2px 0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.top h1{margin:0}
+.langsel{font:inherit;font-size:.85rem;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 10px;min-height:36px;max-width:10.5rem}

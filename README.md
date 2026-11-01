@@ -80,6 +80,25 @@ timetable on the device, in tens of milliseconds.
    The browser asks for permission, and the site's Permissions-Policy has to allow it (`geolocation=(self)`, set in
    site-infra). Times after midnight of the chosen date carry "+1".
 
+## Languages
+
+English, Polski, Русский, Română, Български, Українська, Türkçe, Nederlands, Français and Español. The language is the
+one you chose (the switch in the header, kept on the device), else the first language of the browser that the app has,
+else English. Station names, line names and the name of the app are never translated.
+
+- Every string is a key of `app/locales/en.js`, the source. `app/locales/<code>.js` has exactly the same keys. A value
+  that is an object is a plural (`one`, `few`, `many`, `other`), chosen with `Intl.PluralRules` of the language, so the
+  Slavic forms are right. Dates, weekdays and numbers follow the language through `Intl`.
+- `app/i18n.js` holds `t()` (text) and `th()` (HTML: parameters are escaped), the language switch and the file loading.
+  The locale files are ES modules in the shell, precached by the service worker, so a language works offline.
+- `test/unit/i18n.test.mjs` fails when a locale lacks a key or has an extra one, when a placeholder differs from the
+  English one, when a plural form the language needs is missing, when a value holds markup, when a file is mostly
+  English, and when the code asks for a key that does not exist or English holds a key nothing uses.
+- **The translations are machine-made and have not been read by native speakers.** A correction is a change to one
+  line of one file. A native read per language is the next step.
+- To add a language: copy `en.js` to `<code>.js`, translate it, add the code and its name to `LANGS` in `app/i18n.js`
+  and the file to `SHELL` in `app/sw.js`; `npm test` says what is missing.
+
 ## Hosting and data pipeline
 
 The app is static files on S3 behind CloudFront, at chaintraveler.app. The infrastructure is code in
@@ -148,7 +167,7 @@ next step if the threat model ever needs it.
 
 | Suite | Runs | Covers |
 |---|---|---|
-| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search, the stations nearest to a position. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG. Deterministic, no network. |
+| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search, the stations nearest to a position. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG. Deterministic, no network. The languages (`i18n.test.mjs`): same keys, placeholders and plural forms in every locale, no markup, and every key used. |
 | `test/build/` | on every pull request (Python `unittest`) | The manifest and its checks (changed byte, truncated or missing file, malformed fields), retention of three builds, and `scripts/ci/deploy-shell.sh` and `publish-data.sh` against a fake AWS CLI: the shell deploy never writes under `data/`, the publish never writes outside it, the pointer is written last, a same-day build with other bytes is refused, a damaged upload leaves the old pointer. |
 | `test/feed/` | before a timetable build is published, and locally after `scripts/fetch-feed.sh` | The engine on the real national timetable: size and age of the window, named chains (Wolfsburg to Leipzig and München, München to Wolfsburg via Nürnberg, Wolfsburg to München via Leipzig), the Leipzig footpath, a train past midnight, station search, and Plan B with the planned first train out (ordered ways, none of them the cancelled run, well under a second). Days come from the data, bounds are generous ceilings. |
 
