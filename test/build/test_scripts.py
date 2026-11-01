@@ -1,7 +1,9 @@
-"""Tests of scripts/ci/deploy-shell.sh and scripts/ci/publish-data.sh against a fake AWS CLI (test/ci/fake_aws.py).
+"""Tests of scripts/ci/deploy-shell.sh, scripts/ci/publish-data.sh and scripts/ci/publish-delays.sh against a fake AWS CLI
+(test/ci/fake_aws.py).
 
 They prove what the scripts do and, with the allow and deny prefixes, that they stay inside the permissions of
-their roles: the shell deploy never writes under data/, the data publish never writes outside it.
+their roles: the shell deploy never writes under data/, the data publish never writes outside it, the delays publish
+writes one key.
 """
 import json
 import os
@@ -10,12 +12,15 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(ROOT, 'build'))
 from test_manifest import write_build  # noqa: E402
+import realtime  # noqa: E402
 
 BUCKET = 'test-bucket'
 SW = "const VERSION = '__SHELL_VERSION__';\n"
@@ -244,6 +249,128 @@ class ScriptTest(unittest.TestCase):
     def test_rollback_refuses_a_date_that_is_not_a_date(self):
         r = self.run_script(os.path.join(ROOT, 'scripts', 'ci', 'publish-data.sh'), 'rollback', '../x', BUCKET)
         self.assertEqual(r.returncode, 2)
+
+    # ---- delays publish
+    def delays_dist(self, name, age=30, **over):
+        """A dist directory with data/delays.json whose stream is `age` seconds old. Returns (dist, file bytes)."""
+        d = {'format': 1, 'built': realtime.stamp(time.time()), 'feedTime': realtime.stamp(time.time() - age),
+             'source': {'publisher': 'gtfs.de', 'license': 'CC BY-SA 4.0'}, 'timetable': {'date': '2026-10-31', 'sha256': 'ab' * 32},
+             'trips': {'2026-11-01': {'delay': {'7': 2, '9': 0}, 'cancelled': [3], 'skipped': {}}}}
+        d.update(over)
+        dist = os.path.join(self.tmp, name)
+        os.makedirs(os.path.join(dist, 'data'))
+        data = realtime.dumps(d).encode()
+        with open(os.path.join(dist, 'data', 'delays.json'), 'wb') as f:
+            f.write(data)
+        return dist, data
+
+    def publish_delays(self, dist, **env):
+        return self.run_script(os.path.join(ROOT, 'scripts', 'ci', 'publish-delays.sh'), 'publish', dist, BUCKET, **env)
+
+    def test_delays_publish_writes_one_key_with_a_short_cache_lifetime(self):
+        dist, data = self.delays_dist('a')
+        r = self.publish_delays(dist, FAKE_ALLOW_PREFIX='data/delays.json')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.keys(), ['data/delays.json'])
+        self.assertEqual(self.read('data/delays.json'), data)
+        self.assertEqual(self.meta('data/delays.json'), {'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=30'})
+        self.assertEqual([(c['op'], c['key']) for c in self.calls()], [('put', 'data/delays.json'), ('get', 'data/delays.json')])
+
+    def test_delays_publish_leaves_the_timetable_and_its_pointer_alone(self):
+        self.assertEqual(self.publish(self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32)).returncode, 0)
+        before = {k: self.read(k) for k in self.keys()}
+        mark = len(self.calls())
+        r = self.publish_delays(self.delays_dist('d')[0], FAKE_ALLOW_PREFIX='data/delays.json')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual({k: self.read(k) for k in self.keys() if k != 'data/delays.json'}, before)
+        self.assertEqual({c['key'] for c in self.calls()[mark:]}, {'data/delays.json'}, 'no other key is read, written or deleted')
+        self.assertEqual([c['op'] for c in self.calls()[mark:] if c['op'] in ('put', 'delete')], ['put'])
+
+    def test_the_timetable_publish_leaves_the_delays_alone(self):
+        dist, data = self.delays_dist('d')
+        self.assertEqual(self.publish_delays(dist).returncode, 0)
+        for i, day in enumerate(['2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31']):
+            r = self.publish(self.make_dist(day, day + 'T09:50:00Z', '%02x' % (i + 1) * 32))
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.read('data/delays.json'), data, 'the pruning of old builds does not touch it')
+
+    def test_delays_publish_replaces_an_older_file_and_keeps_a_newer_one(self):
+        old, _ = self.delays_dist('old', age=240)
+        new, new_bytes = self.delays_dist('new', age=60)
+        self.assertEqual(self.publish_delays(old).returncode, 0)
+        r = self.publish_delays(new)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self.read('data/delays.json'), new_bytes)
+        puts = len([c for c in self.calls() if c['op'] == 'put'])
+        r = self.publish_delays(old)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('nothing to do', r.stdout)
+        self.assertEqual(self.read('data/delays.json'), new_bytes, 'a late run does not put older data over newer')
+        self.assertEqual(len([c for c in self.calls() if c['op'] == 'put']), puts)
+
+    def test_delays_publish_does_not_upload_the_same_stream_twice(self):
+        dist, _ = self.delays_dist('a')
+        self.assertEqual(self.publish_delays(dist).returncode, 0)
+        puts = len([c for c in self.calls() if c['op'] == 'put'])
+        r = self.publish_delays(dist)
+        self.assertEqual((r.returncode, len([c for c in self.calls() if c['op'] == 'put'])), (0, puts))
+
+    def test_delays_publish_replaces_an_object_it_cannot_read(self):
+        os.makedirs(os.path.join(self.s3, BUCKET, 'data'))
+        with open(os.path.join(self.s3, BUCKET, 'data', 'delays.json'), 'w') as f:
+            f.write('<html>not json</html>')
+        dist, data = self.delays_dist('a')
+        self.assertEqual(self.publish_delays(dist).returncode, 0)
+        self.assertEqual(self.read('data/delays.json'), data)
+
+    def test_delays_publish_refuses_a_stale_file(self):
+        dist, _ = self.delays_dist('a', age=15 * 60 + 30)
+        r = self.publish_delays(dist)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('minutes old', r.stderr)
+        self.assertEqual([c for c in self.calls() if c['op'] == 'put'], [])
+
+    def test_delays_publish_refuses_a_file_the_app_could_not_read(self):
+        for over in ({'format': 2}, {'trips': []}, {'timetable': {}}, {'feedTime': 'yesterday'}):
+            dist, _ = self.delays_dist('bad%d' % len(os.listdir(self.tmp)), **over)
+            r = self.publish_delays(dist)
+            self.assertEqual(r.returncode, 1, over)
+        dist = os.path.join(self.tmp, 'junk')
+        os.makedirs(os.path.join(dist, 'data'))
+        with open(os.path.join(dist, 'data', 'delays.json'), 'w') as f:
+            f.write('{"format": 1')
+        self.assertEqual(self.publish_delays(dist).returncode, 1)
+        self.assertEqual([c for c in self.calls() if c['op'] == 'put'], [])
+
+    def test_delays_publish_refuses_a_file_above_the_size_limit(self):
+        dist, _ = self.delays_dist('big')
+        with open(os.path.join(dist, 'data', 'delays.json'), 'a') as f:
+            f.write(' ' * (realtime.MAX_FILE_BYTES + 1))
+        r = self.publish_delays(dist)
+        self.assertEqual(r.returncode, 1)
+        self.assertEqual(self.keys(), [])
+
+    def test_delays_publish_fails_when_the_upload_is_damaged(self):
+        dist, _ = self.delays_dist('a')
+        r = self.publish_delays(dist, FAKE_CORRUPT_UPLOAD='1')
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('differs from the file', r.stdout + r.stderr)
+
+    def test_delays_publish_fails_where_the_role_may_not_write(self):
+        dist, _ = self.delays_dist('a')
+        r = self.publish_delays(dist, FAKE_ALLOW_PREFIX='data/latest.json')
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(self.keys(), [])
+
+    def test_delays_publish_usage(self):
+        script = os.path.join(ROOT, 'scripts', 'ci', 'publish-delays.sh')
+        self.assertEqual(self.run_script(script).returncode, 2)
+        self.assertEqual(self.run_script(script, 'publish', os.path.join(self.tmp, 'x')).returncode, 2)
+        self.assertEqual(self.run_script(script, 'rollback', 'x', BUCKET).returncode, 2)
+        empty = os.path.join(self.tmp, 'empty')
+        os.makedirs(empty)
+        self.assertEqual(self.publish_delays(empty).returncode, 2)
+        self.assertEqual(self.calls(), [])
 
 
 if __name__ == '__main__':
