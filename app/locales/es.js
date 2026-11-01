@@ -152,6 +152,10 @@ export default {
   'nav.privacy': 'Si lo permites, tu ubicación se queda en este dispositivo.',
   'nav.near': 'Estás cerca de {station} ({dist}).',
   'nav.nowhere': 'No hay ninguna estación con trenes a menos de 5 km.',
+  'nav.here': 'Estás aquí',
+  'nav.graph': 'Tu ruta y sus alternativas',
+  'nav.legendRoute': 'Línea gruesa: tu ruta. Colores: las demás alternativas si el siguiente tren está cancelado, según cuánto más tarde llegues.',
+  'nav.legendOld': 'Línea de puntos: el plan antes del último recálculo.',
   'nav.test': 'Reloj de prueba',
   'nav.clock': 'Simular la hora',
 

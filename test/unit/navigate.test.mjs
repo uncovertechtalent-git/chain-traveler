@@ -5,7 +5,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Timetable } from '../../app/engine.js';
 import { plan } from '../../app/planb.js';
-import { where, assess, replan, tripOf, legKey, toStored, fromStored, MISSED_AFTER, NEAR_KM, ELSEWHERE_KM, ELSEWHERE_WITHIN } from '../../app/navigate.js';
+import { where, assess, replan, tripOf, legKey, toStored, fromStored, positionOf, whatIf, MISSED_AFTER, NEAR_KM, ELSEWHERE_KM, ELSEWHERE_WITHIN } from '../../app/navigate.js';
+import { graphOf } from '../../app/planb.js';
+import { svgOf } from '../../app/graph.js';
 import { buildFixture, hm } from '../support/fixture.mjs';
 
 const stations = [
@@ -157,4 +159,76 @@ test('a chain after midnight keeps counting: the legs past 24:00 are on the next
   assert.equal(where(late, 1440).phase, 'riding');
   assert.equal(where(late, 1440).inMin, 60);
   assert.equal(where(late, 1500).phase, 'done');
+});
+
+// ---- the map: where you are on it, and the ways around the route
+test('positionOf: at the station you wait at, on the line while you ride, at the end when done, the device when it says', () => {
+  const at = st => ({ lat: tt.lat[st], lon: tt.lon[st] });
+  const before = positionOf(tt, legs, hm('06:00'));
+  assert.deepEqual([before.lat, before.lon, before.source], [at(A).lat, at(A).lon, 'clock']);
+  const wait = positionOf(tt, legs, hm('07:30'));
+  assert.deepEqual([wait.lat, wait.lon], [at(M).lat, at(M).lon], 'at the change station');
+  const mid = positionOf(tt, legs, legs[0].dep + (legs[0].arr - legs[0].dep) / 2);
+  assert.ok(Math.abs(mid.lat - (at(A).lat + at(M).lat) / 2) < 1e-9 && Math.abs(mid.lon - (at(A).lon + at(M).lon) / 2) < 1e-9, 'halfway through the leg, halfway along it');
+  const quarter = positionOf(tt, legs, legs[0].dep + (legs[0].arr - legs[0].dep) / 4);
+  assert.ok(Math.abs(quarter.lat - (at(A).lat * 0.75 + at(M).lat * 0.25)) < 1e-9, 'a quarter of the way');
+  const done = positionOf(tt, legs, hm('09:30'));
+  assert.deepEqual([done.lat, done.lon], [at(D).lat, at(D).lon]);
+  const device = positionOf(tt, legs, hm('07:00'), { lat: 50.5, lon: 11.5 });
+  assert.deepEqual([device.lat, device.lon, device.source], [50.5, 11.5, 'device']);
+  assert.equal(positionOf(tt, legs, hm('07:00'), { lat: NaN, lon: 1 }).source, 'clock', 'a broken position is not used');
+});
+
+test('whatIf: from the station of the next train you have not boarded, with that train out', () => {
+  const n = { ...nav(), legs };
+  const before = whatIf(tt, n, hm('06:10'));
+  assert.equal(before.src, A);
+  assert.equal(before.next.line, 'RE6');
+  assert.ok(!before.result.error);
+  assert.equal(before.result.options[0].arr, hm('09:00'), 'the detour through Seitenweg: no later than planned');
+  assert.ok(before.result.options.every(o => o.legs[0].line !== 'RE6'), 'the planned train is not among the ways');
+  const riding = whatIf(tt, n, hm('06:40'));
+  assert.equal(riding.src, M, 'while you ride, from the change station');
+  assert.equal(riding.t0, hm('07:28'), 'at the minute you get there');
+  assert.equal(riding.next.line, 'RE30');
+  assert.equal(whatIf(tt, n, hm('08:50')), null, 'on the last train there is none ahead to be out');
+  assert.equal(whatIf(tt, n, hm('09:30')), null, 'done');
+});
+
+test('whatIf keeps the runs already out, out', () => {
+  const n = { ...nav(), legs, out: new Set([tt.tripKey(0, 6)]) };   // the RB to Seitenweg is out as well
+  const r = whatIf(tt, n, hm('06:10'));
+  assert.ok(r.result.options.every(o => !(o.legs[0].line === 'RB' && o.legs[0].dep === hm('06:40'))), 'no way starts with the 06:40 RB to Seitenweg');
+  assert.equal(r.result.options[0].arr, hm('10:00'));
+});
+
+test('the map draws the route bold, the old plan dotted, the ways coloured and you, with the same positions for the same station', () => {
+  const n = { ...nav(), legs };
+  const wi = whatIf(tt, n, hm('06:10'));
+  const me = positionOf(tt, legs, hm('06:10'));
+  const model = graphOf(tt, wi.result, { ghost: [{ from: A, to: M }], active: legs.filter(l => !l.walk), me: { ...me, label: 'You are here' } });
+  const svg = svgOf(model, { label: 'map' });
+  assert.ok(svg.includes('class="e act"'), 'the route');
+  assert.ok(svg.includes('class="e ghost"'), 'the plan before');
+  assert.match(svg, /class="e (good|mid|bad)"/, 'the ways');
+  assert.ok(svg.includes('class="me"') && svg.includes('class="me halo"'), 'you');
+  assert.ok(svg.includes('>You are here<'), 'labelled');
+  assert.ok(svg.lastIndexOf('class="e act"') > svg.lastIndexOf('class="e ghost"') && svg.lastIndexOf('class="e ghost"') > svg.indexOf('class="e good"'), 'route over plan over ways');
+  assert.ok(svg.indexOf('class="me"') > svg.lastIndexOf('class="e act"'), 'you are drawn last');
+  assert.ok(!/\sstyle\s*=/.test(svg));
+});
+
+test('the map copes with no ways at all: the route and you', () => {
+  const stub = { options: [], src: A, dst: D, t0: hm('08:50'), baseKind: 'plan' };
+  const svg = svgOf(graphOf(tt, stub, { active: legs.slice(2), me: { lat: 51.4, lon: 12.1, label: 'Here' } }), { label: 'map' });
+  assert.ok(svg.includes('class="e act"') && svg.includes('class="me"'));
+  assert.ok(!svg.includes('class="e good"') && !svg.includes('class="e bad"'));
+});
+
+test('where: the minute a train arrives you are at its station, waiting for the next; the minute one leaves you are on it', () => {
+  const arrived = where(legs, legs[0].arr);
+  assert.deepEqual([arrived.phase, arrived.i, arrived.leg.line, arrived.inMin], ['waiting', 1, 'RE30', hm('07:35') - hm('07:28')]);
+  const leaving = where(legs, legs[1].dep);
+  assert.deepEqual([leaving.phase, leaving.i, leaving.leg.line], ['riding', 1, 'RE30']);
+  assert.equal(where(legs, legs[1].dep - 1).phase, 'waiting', 'a minute before it leaves you are still waiting');
 });

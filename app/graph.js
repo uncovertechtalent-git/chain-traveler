@@ -8,7 +8,8 @@ export const WIDTH = 720, HEIGHT = 520;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // "Leipzig Hbf" is "Leipzig", "Leipzig Hbf (tief)" is "Leipzig (tief)": two stations a short walk apart stay two labels.
 export const short = name => name.replace(/\s+Hbf(\s*\(tief\))?$/, (m, tief) => (tief ? ' (tief)' : ''));
-const ORDER = { bad: 0, mid: 1, good: 2, ghost: 3 };      // drawn in this order: the good ways on top of the bad, the plan we had over all
+const ORDER = { bad: 0, mid: 1, good: 2, ghost: 3, active: 4 };   // drawn in this order: the good ways on top of the bad, the plan we had over those, the route being followed over all
+const kindOf = e => (e.kind === 'ghost' || e.kind === 'active' ? e.kind : e.band);
 
 // 1 train an hour is a thin line, 4 or more a thick one.
 export const widthOf = perHour => +(2 + 1.75 * Math.min(4, Math.max(1, perHour))).toFixed(2);
@@ -100,17 +101,18 @@ function timeOf(n, t0) {
 }
 
 export function svgOf(model, { width = WIDTH, height = HEIGHT, label = 'Ways on', min = 'min' } = {}) {
-  const proj = projector(model.nodes, { width, height, padX: width < 500 ? 70 : 96 });
+  const proj = projector(model.me ? [...model.nodes, model.me] : model.nodes, { width, height, padX: width < 500 ? 70 : 96 });
   const pos = model.nodes.map(n => proj(n.lat, n.lon));
   const at = new Map(model.nodes.map((n, i) => [n.st, pos[i]]));
   const onWays = new Set(model.nodes.map(n => n.st));
-  const edges = [...model.edges].sort((a, b) => ORDER[a.kind === 'ghost' ? 'ghost' : a.band] - ORDER[b.kind === 'ghost' ? 'ghost' : b.band]);
+  const edges = [...model.edges].sort((a, b) => ORDER[kindOf(a)] - ORDER[kindOf(b)]);
   let s = `<svg class="pb" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(label)}"><title>${esc(label)}</title>`;
   const ctx = model.context && model.context.nodes.length ? model.context : null;
   if (ctx) s += contextSvg(ctx, proj, { width, height }, onWays);
   for (const e of edges) {
     const a = at.get(e.from), b = at.get(e.to);
     if (e.kind === 'ghost') s += `<line class="e ghost" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+    else if (e.kind === 'active') s += `<line class="e act" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke-width="6"/>`;
     else if (e.kind === 'walk') s += `<line class="e walk ${e.band}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke-width="3"/>`;
     else s += `<line class="e ${e.band}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke-width="${widthOf(e.perHour)}"/>`;
   }
@@ -126,11 +128,17 @@ export function svgOf(model, { width = WIDTH, height = HEIGHT, label = 'Ways on'
     const tm = timeOf(n, model.t0) + (n.dst && n.delta > 0 ? ' +' + n.delta + ' ' + min : '');
     return { n, x: p.x, y: p.y, nm: short(n.name), tm, w: Math.max(short(n.name).length * 7.2, tm.length * 6.6) + 4, h: 30 };
   });
+  const me = model.me ? proj(model.me.lat, model.me.lon) : null;
+  if (me) {
+    s += `<circle class="me halo" cx="${me.x}" cy="${me.y}" r="12"/><circle class="me" cx="${me.x}" cy="${me.y}" r="6"/>`;
+    if (model.me.label) items.push({ n: { name: model.me.label, src: true }, x: me.x, y: me.y, nm: model.me.label, tm: '', w: model.me.label.length * 7.2 + 4, h: 14, me: true });
+  }
   // The names of the busiest stations around come last, so the stations on the ways keep their places.
   const hub = ctx ? hubs(ctx, proj, { width, height }, onWays, pos) : [];
   for (const { n, p } of hub) items.push({ n, x: p.x, y: p.y, nm: short(n.name), tm: '', w: short(n.name).length * 6.4 + 4, h: 14, hub: true });
   placeLabels(items, width).forEach((r, k) => {
     const it = items[k], key = it.n.src || it.n.dst;
+    if (it.me) { s += `<text class="nm key me" x="${r.x}" y="${r.y}" text-anchor="${r.anchor}">${esc(it.nm)}</text>`; return; }
     if (it.hub) { if (r.clear) s += `<text class="nm hub" x="${r.x}" y="${r.y}" text-anchor="${r.anchor}">${esc(it.nm)}</text>`; return; }
     s += `<text class="nm${key ? ' key' : ''}" x="${r.x}" y="${r.y}" text-anchor="${r.anchor}">${esc(it.nm)}</text>`;
     if (it.tm) s += `<text class="tm" x="${r.x}" y="${r.y + 13}" text-anchor="${r.anchor}">${esc(it.tm)}</text>`;

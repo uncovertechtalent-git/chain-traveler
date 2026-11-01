@@ -154,6 +154,10 @@ export default {
   'nav.privacy': 'İzin verirseniz konumunuz bu cihazda kalır.',
   'nav.near': 'Yakınınızdaki istasyon: {station} ({dist}).',
   'nav.nowhere': 'Çevrenizde 5 km içinde tren olan istasyon yok.',
+  'nav.here': 'Buradasınız',
+  'nav.graph': 'Güzergâhınız ve çevresindeki seçenekler',
+  'nav.legendRoute': 'Kalın çizgi: güzergâhınız. Renkler: sonraki tren iptal olursa diğer seçenekler, ne kadar geç vardığınıza göre.',
+  'nav.legendOld': 'Noktalı çizgi: son yeniden hesaplamadan önceki plan.',
   'nav.test': 'Test saati',
   'nav.clock': 'Saat şu olsun',
 

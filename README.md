@@ -95,8 +95,10 @@ network follows a moment later; it is kept for a redraw with the same inputs.
 Press "Follow this chain" on a chain, or "Follow this way" on a way in Plan B, and a card stays at the top of every tab: what
 to do now ("Next: RE6 from Wolfsburg Hbf to Magdeburg Hbf, leaves 06:23, in 13 min", "On the RE6: get off at Magdeburg Hbf at
 07:28", "At Magdeburg Hbf: RE30 leaves 07:35, in 5 min"), what comes then, and the arrival against the plan you started
-with. This is GPS on the trains the Deutschlandticket allows, and like a GPS it recalculates by itself when you leave the
-route. On a train network "leaving the route" means two things:
+with, and a map of it: your route bold, you on it (the position the device gave, else where the clock puts you, moving along
+the line while you ride), the other ways coloured green, amber and red by how much later they arrive if the next train is
+out, and, after a recalculation, the plan you had dotted. This is GPS on the trains the Deutschlandticket allows, and like a
+GPS it recalculates by itself when you leave the route. On a train network "leaving the route" means two things:
 
 - **You missed the train.** Either you say so ("I missed it"), or, if you allow position tracking, you are still within 600 m of
   its station two minutes after it left. Without a position the app assumes you are on board, as a GPS assumes you are on the
