@@ -102,3 +102,31 @@ test('a file with the wrong magic is refused', () => {
   new Uint8Array(bad)[0] = 0x58;
   assert.throws(() => new Timetable(meta, bad), /bad timetable file/);
 });
+
+test('nearby lists the stations closest to a position, nearest first, with the distance in km', () => {
+  const near = tt.nearby({ lat: 50.4, lon: 11.5 });
+  assert.deepEqual(near.slice(0, 2).map(x => tt.names[x.station]), ['Delta Süd', 'Delta Hbf']);
+  assert.ok(Math.abs(near[0].km - 10.0) < 0.2, 'Delta Süd is 0.09 degrees of latitude away, about 10 km: ' + near[0].km);
+  assert.ok(Math.abs(near[1].km - 11.1) < 0.2, 'Delta Hbf is 0.1 degrees away, about 11.1 km: ' + near[1].km);
+  assert.ok(near.every((x, i) => i === 0 || near[i - 1].km <= x.km), 'sorted by distance');
+  const here = tt.nearby({ lat: 51.5, lon: 10.5, limit: 1 });
+  assert.equal(tt.names[here[0].station], 'Beta Hbf');
+  assert.ok(here[0].km < 0.001);
+});
+
+test('nearby honours the limit and the distance ceiling', () => {
+  assert.equal(tt.nearby({ lat: 50.4, lon: 11.5, limit: 1 }).length, 1);
+  assert.deepEqual(tt.nearby({ lat: 50.4, lon: 11.5, maxKm: 10.5 }).map(x => tt.names[x.station]), ['Delta Süd']);
+  assert.deepEqual(tt.nearby({ lat: 50.4, lon: 11.5, maxKm: 1 }), []);
+});
+
+test('nearby leaves out a station that no train leaves from', () => {
+  assert.equal(tt.degree[st('Epsilon Hbf')], 0, 'Epsilon is only ever the end of a trip in the fixture');
+  assert.deepEqual(tt.nearby({ lat: 50.0, lon: 12.0, maxKm: 1 }), []);
+});
+
+test('nearby on a position that is not one gives an empty list', () => {
+  for (const p of [{ lat: NaN, lon: 10 }, { lat: 50, lon: undefined }, { lat: 91, lon: 10 }, { lat: 50, lon: -181 }, { lat: null, lon: null }]) {
+    assert.deepEqual(tt.nearby(p), [], JSON.stringify(p));
+  }
+});

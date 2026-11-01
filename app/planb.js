@@ -50,22 +50,22 @@ function describe(tt, o, { day, exclude }) {
 // Names for what sets a way apart, only where it does tell the ways apart.
 function tag(options) {
   options.forEach(o => { o.tags = []; });
-  options[0].tags.push('Earliest arrival');
+  options[0].tags.push('earliest');
   if (options.length < 2) return;
   const fewest = Math.min(...options.map(o => o.changes));
   const fewList = options.filter(o => o.changes === fewest);
-  if (fewList.length < options.length) fewList.forEach(o => o.tags.push('Fewest changes'));
+  if (fewList.length < options.length) fewList.forEach(o => o.tags.push('fewest'));
   const most = Math.max(...options.map(o => o.thinnest));
   const robust = options.filter(o => o.thinnest === most);
-  if (robust.length < options.length) robust.forEach(o => o.tags.push('Most trains an hour'));
+  if (robust.length < options.length) robust.forEach(o => o.tags.push('robust'));
 }
 
 // The ways on, against the plan. plannedArr is the arrival the plan promised (minutes after midnight of `day`); without
 // it the best way on is the yardstick.
 export function plan(tt, { day, src, dst, t0, plannedArr = null, exclude = null, minTransfer = 4, window = 180, max = 4 }) {
-  if (src === dst) return { options: [], error: 'You are already at the target.' };
+  if (src === dst) return { options: [], error: 'You are already at the target.', code: 'alreadyThere' };
   const found = ways(tt, { day, src, dst, t0, exclude, minTransfer, window, max });
-  if (!found.length) return { options: [], error: 'No way on to the target from here after that time.' };
+  if (!found.length) return { options: [], error: 'No way on to the target from here after that time.', code: 'noWay' };
   const base = plannedArr !== null ? plannedArr : found[0].arr;
   const options = found.map(o => {
     const d = describe(tt, o, { day, exclude });
@@ -76,9 +76,23 @@ export function plan(tt, { day, src, dst, t0, plannedArr = null, exclude = null,
   return { options, base, baseKind: plannedArr !== null ? 'plan' : 'best', src, dst, t0 };
 }
 
+// The network around the journey, for the graph: the stations reachable from src within maxMin minutes and the leg that
+// first reaches each (the earliest-arrival tree), with positions. Quiet background: it belongs to no way.
+export function contextOf(tt, { day, src, t0, exclude = null, minTransfer = 4, maxMin = 180 }) {
+  const edges = tt.reachEdges(tt.earliestArrival({ day, src, t0, minTransfer, exclude }), { maxMin });
+  const ids = new Set();
+  for (const e of edges) { ids.add(e.from); ids.add(e.to); }
+  return {
+    nodes: [...ids].map(st => ({ st, name: tt.names[st], lat: tt.lat[st], lon: tt.lon[st], deg: tt.degree[st] })),
+    edges: edges.map(e => ({ from: e.from, to: e.to })),
+  };
+}
+
 // The ways as a graph: stations as nodes, legs as edges. An edge takes the colour of the best way that uses it and the
 // most trains an hour of any way that uses it. ghost: the legs of the original plan still ahead, drawn for comparison.
-export function graphOf(tt, result, { ghost = null } = {}) {
+// context: contextOf(), carried along for the drawing. active: the legs of the route being followed, drawn bold on top
+// (Navigate). me: { lat, lon, label }, the traveller's position, drawn last.
+export function graphOf(tt, result, { ghost = null, context = null, active = null, me = null } = {}) {
   const nodes = new Map(), edges = new Map();
   const node = s => {
     if (!nodes.has(s)) nodes.set(s, { st: s, name: tt.names[s], lat: tt.lat[s], lon: tt.lon[s], arr: null, rank: 3, src: s === result.src, dst: s === result.dst });
@@ -89,6 +103,11 @@ export function graphOf(tt, result, { ghost = null } = {}) {
     node(g.from); node(g.to);
     const key = 'g' + g.from + '>' + g.to;
     if (!edges.has(key)) edges.set(key, { from: g.from, to: g.to, kind: 'ghost' });
+  }
+  for (const g of active || []) {
+    node(g.from); node(g.to);
+    const key = 'a' + g.from + '>' + g.to;
+    if (!edges.has(key)) edges.set(key, { from: g.from, to: g.to, kind: 'active' });
   }
   result.options.forEach((o, idx) => {
     o.legs.forEach((l, i) => {
@@ -105,6 +124,6 @@ export function graphOf(tt, result, { ghost = null } = {}) {
   });
   for (const e of edges.values()) out.push(e);
   const dstNode = nodes.get(result.dst);
-  if (dstNode) { const best = result.options.reduce((m, o) => (o.delta < m.delta ? o : m), result.options[0]); dstNode.delta = best.delta; dstNode.band = best.band; }
-  return { nodes: [...nodes.values()], edges: out, src: result.src, dst: result.dst, t0: result.t0, baseKind: result.baseKind };
+  if (dstNode && result.options.length) { const best = result.options.reduce((m, o) => (o.delta < m.delta ? o : m), result.options[0]); dstNode.delta = best.delta; dstNode.band = best.band; }
+  return { nodes: [...nodes.values()], edges: out, src: result.src, dst: result.dst, t0: result.t0, baseKind: result.baseKind, context, me };
 }

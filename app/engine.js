@@ -119,6 +119,20 @@ export class Timetable {
     return best;
   }
 
+  // The stations nearest to a position in degrees, nearest first, as { station, km } (great-circle). Only stations a
+  // train leaves from; none farther than maxKm. Bad input gives an empty list.
+  nearby({ lat, lon, limit = 4, maxKm = 40 }) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return [];
+    const rad = Math.PI / 180, cosLat = Math.cos(lat * rad), out = [];
+    for (let s = 0; s < this.nStations; s++) {
+      if (!this.degree[s]) continue;
+      const a = Math.sin((this.lat[s] - lat) * rad / 2) ** 2 + cosLat * Math.cos(this.lat[s] * rad) * Math.sin((this.lon[s] - lon) * rad / 2) ** 2;
+      const km = 12742 * Math.asin(Math.sqrt(a));
+      if (km <= maxKm) out.push({ station: s, km });
+    }
+    return out.sort((x, y) => x.km - y.km).slice(0, limit);
+  }
+
   // A trip runs once per service day; a cancellation hits one run. Runs are keyed by service day and trip number.
   tripKey(svcDay, trip) { return svcDay * this.nTrips + trip; }
 
@@ -175,6 +189,23 @@ export class Timetable {
     return { arr, inC, footFrom, tripBoard, src, day, t0 };
   }
 
+  // The edges of the earliest-arrival tree in `res`, for the network around a journey: each station reached within
+  // maxMin minutes of the start, with the station its last leg (or walk) started from, as { from, to, arr }.
+  reachEdges(res, { maxMin = 180 } = {}) {
+    const out = [];
+    for (let s = 0; s < this.nStations; s++) {
+      if (s === res.src || res.arr[s] >= INF || res.arr[s] - res.t0 > maxMin) continue;
+      let from = -1;
+      if (res.footFrom[s] >= 0) from = res.footFrom[s];
+      else if (res.inC[s] >= 0) {
+        const e = res.inC[s];
+        from = this.connFrom[decCi(res.tripBoard[decLayer(e) * this.nTrips + this.connTrip[decCi(e)]])];
+      }
+      if (from >= 0) out.push({ from, to: s, arr: res.arr[s] });
+    }
+    return out;
+  }
+
   legsTo(res, dst) {
     const legs = [];
     let s = dst, guard = 0;
@@ -202,18 +233,18 @@ export class Timetable {
 
   // Plan src -> dst, optionally with a stop-over of at least stayMin minutes at `via`.
   plan({ day, src, dst, t0, via = -1, stayMin = 180, minTransfer = 4 }) {
-    if (src === dst) return { error: 'Start and target are the same station.' };
+    if (src === dst) return { error: 'Start and target are the same station.', code: 'sameStation' };
     if (via >= 0 && via !== src && via !== dst) {
       const r1 = this.earliestArrival({ day, src, t0, minTransfer, target: via });
-      if (r1.arr[via] >= INF) return { error: 'The stop-over cannot be reached after the start time.' };
+      if (r1.arr[via] >= INF) return { error: 'The stop-over cannot be reached after the start time.', code: 'viaUnreachable' };
       const tv = r1.arr[via];
       const r2 = this.earliestArrival({ day, src: via, t0: tv + stayMin, minTransfer, target: dst });
-      if (r2.arr[dst] >= INF) return { error: 'No onward connection after the stay; try a shorter stay or an earlier start.' };
+      if (r2.arr[dst] >= INF) return { error: 'No onward connection after the stay; try a shorter stay or an earlier start.', code: 'noOnward' };
       const legs1 = this.legsTo(r1, via), legs2 = this.legsTo(r2, dst);
       return { legs: [...legs1, ...legs2], stays: [{ station: via, arr: tv, dep: legs2[0].dep }], reach: r1 };
     }
     const r = this.earliestArrival({ day, src, t0, minTransfer, target: dst });
-    if (r.arr[dst] >= INF) return { error: 'No connection that day after the start time.' };
+    if (r.arr[dst] >= INF) return { error: 'No connection that day after the start time.', code: 'noConnection' };
     return { legs: this.legsTo(r, dst), stays: [], reach: r };
   }
 

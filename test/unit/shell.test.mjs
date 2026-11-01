@@ -8,7 +8,16 @@ import { fileURLToPath } from 'node:url';
 
 const app = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'app');
 const read = f => fs.readFileSync(path.join(app, f), 'utf8');
-const shellFiles = fs.readdirSync(app, { withFileTypes: true }).filter(d => d.isFile() && !d.name.startsWith('.') && d.name !== 'sw.js' && d.name !== '404.html').map(d => d.name).sort();
+// Every file of the app except the service worker, the data (laid out by the pipeline) and the 404 page with its script.
+const NOT_SHELL = new Set(['sw.js', '404.html', 'notfound.js']);
+function listShell(dir = '') {
+  return fs.readdirSync(path.join(app, dir), { withFileTypes: true }).flatMap(d => {
+    const rel = dir ? dir + '/' + d.name : d.name;
+    if (d.name.startsWith('.') || rel === 'data' || NOT_SHELL.has(rel)) return [];
+    return d.isDirectory() ? listShell(rel) : [rel];
+  });
+}
+const shellFiles = listShell().sort();
 
 // 404.html is served by the CDN for missing paths (site-infra: custom error response) and is not part of the offline shell.
 test('the service worker precaches exactly the shell files', () => {
@@ -30,7 +39,7 @@ test('index.html has no inline script, no inline style and no event handler attr
 });
 
 test('the scripts do not build markup with inline styles or handlers', () => {
-  for (const f of ['app.js', 'data-store.js', 'engine.js', 'planb.js', 'graph.js', 'live.js']) {
+  for (const f of ['app.js', 'data-store.js', 'engine.js', 'planb.js', 'graph.js', 'zoomview.js', 'live.js', 'navigate.js', 'i18n.js', 'notfound.js']) {
     const js = read(f);
     assert.ok(!/style\s*=\s*["'\\]/.test(js.replace(/\.style\.[a-z]+\s*=/g, '')), f + ': style attribute in markup');
     assert.ok(!/\son(click|load|error|input|change)\s*=\s*["']/.test(js), f + ': handler attribute in markup');
@@ -47,13 +56,23 @@ test('every local file the page names exists', () => {
 });
 
 test('the app makes no network request except to its own files', () => {
-  for (const f of ['app.js', 'data-store.js', 'sw.js', 'engine.js', 'planb.js', 'graph.js', 'live.js']) {
+  for (const f of ['app.js', 'data-store.js', 'sw.js', 'engine.js', 'planb.js', 'graph.js', 'live.js', 'navigate.js', 'i18n.js', 'notfound.js', ...fs.readdirSync(path.join(app, 'locales')).map(f => 'locales/' + f)]) {
     assert.ok(!/https?:\/\//.test(read(f).replace(/\/\/ .*$/gm, '')), f + ' names an absolute URL');
   }
 });
 
-test('the 404 page exists and needs no script', () => {
+test('the 404 page exists, has no inline script and only the script that picks the language', () => {
   const html = read('404.html');
-  assert.ok(!/<script/i.test(html) && !/\sstyle\s*=/i.test(html));
+  assert.ok(!/<script(?![^>]*\ssrc=)[^>]*>/i.test(html) && !/\sstyle\s*=/i.test(html) && !/\son[a-z]+\s*=/i.test(html));
+  assert.deepEqual([...html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map(m => m[1]), ['/notfound.js']);
+  assert.ok(fs.existsSync(path.join(app, 'notfound.js')));
   assert.match(html, /href="\/style\.css"/);
+});
+
+test('the locales hold no code that does anything: plain data only', () => {
+  for (const f of fs.readdirSync(path.join(app, 'locales'))) {
+    const js = read('locales/' + f).replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '');
+    assert.ok(/^\s*export default \{[\s\S]*\};\s*$/.test(js), f + ': one default export of an object');
+    assert.ok(!/\b(import|require|eval|fetch|function)\b|=>|new Function/.test(js), f + ': code in a locale');
+  }
 });
