@@ -1,6 +1,7 @@
 import { Timetable, fmt, INF } from './engine.js';
 import { t, th, raw, dur, minutes, num, dayLabel, errText, setLang, initialLang, onLang, applyStatic, LANGS, lang } from './i18n.js';
 import { DataStore, gunzip, describeAge } from './data-store.js';
+import { MANIFEST_KEYS } from './keys.js';
 import { initLive } from './live.js';
 import { initNavigate } from './navigate.js';
 
@@ -392,7 +393,7 @@ async function start() {
     status.textContent = t('status.noCache');
     return;
   }
-  store = new DataStore({ caches: self.caches, fetch: (u, i) => fetch(u, i), subtle: crypto.subtle, base: new URL('./', location.href).href });
+  store = new DataStore({ caches: self.caches, fetch: (u, i) => fetch(u, i), subtle: crypto.subtle, base: new URL('./', location.href).href, keys: MANIFEST_KEYS });
   $('#retry').onclick = () => { status.textContent = t('status.loading'); $('#retry').hidden = true; checkForUpdate(); };
   window.addEventListener('online', checkForUpdate);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastCheck > SIX_HOURS) checkForUpdate(); });

@@ -36,7 +36,33 @@ export function validateManifest(m) {
   for (const k of ['bytes', 'metaBytes', 'nDays']) if (!isInt(m[k])) bad(k);
   if (m.bytes > MAX_BYTES || m.metaBytes > MAX_BYTES) bad('size above the limit');
   if (typeof m.built !== 'string') bad('built');
+  if ('kid' in m && !(typeof m.kid === 'string' && /^[0-9a-f]{8}$/.test(m.kid))) bad('kid');
+  if ('sig' in m && !(typeof m.sig === 'string' && /^[A-Za-z0-9+/]{86}==$/.test(m.sig))) bad('sig');
   return m;
+}
+
+// ---- the signature of the manifest
+// The manifest may carry kid (which key) and sig (ECDSA P-256, SHA-256, r|s in base64) over its canonical form: the
+// fields except sig, keys sorted, no spaces (build/manifest.py makes the same bytes; a golden test holds both). An app
+// that holds public keys (app/keys.js) accepts a build only from a manifest signed by one of them; an app that holds
+// none checks the hashes only, as before.
+export function canonicalManifest(m) {
+  const o = {};
+  for (const k of Object.keys(m).sort()) if (k !== 'sig') o[k] = m[k];
+  return new TextEncoder().encode(JSON.stringify(o));
+}
+const fromBase64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+
+// keys: { <kid>: <base64 SubjectPublicKeyInfo> }. Throws UpdateError('signature') unless m is signed by one of them.
+export async function verifySignature(subtle, m, keys) {
+  const spki = typeof m.kid === 'string' && Object.hasOwn(keys, m.kid) ? keys[m.kid] : null;
+  if (!spki || typeof m.sig !== 'string') throw new UpdateError('signature', 'the manifest is not signed by a key this app trusts');
+  let ok = false;
+  try {
+    const key = await subtle.importKey('spki', fromBase64(spki), { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+    ok = await subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key, fromBase64(m.sig), canonicalManifest(m));
+  } catch { ok = false; }
+  if (!ok) throw new UpdateError('signature', 'the manifest signature does not match');
 }
 
 // 'same' when the build in use is exactly the published one, otherwise 'different'. The date alone is not enough:
@@ -83,9 +109,10 @@ export function describeAge(manifest, today) {
 
 export class DataStore {
   // base: absolute URL of the app directory, ending in "/". caches: CacheStorage. subtle: SubtleCrypto.
-  constructor({ caches, fetch, subtle, base }) {
+  // keys: public keys that may sign the manifest (app/keys.js); none: the manifest is not checked for a signature.
+  constructor({ caches, fetch, subtle, base, keys = {} }) {
     if (!base.endsWith('/')) throw new Error('base must end with "/"');
-    Object.assign(this, { caches, fetchFn: fetch, subtle, base });
+    Object.assign(this, { caches, fetchFn: fetch, subtle, base, keys });
     this.inflight = null;
   }
 
@@ -128,7 +155,9 @@ export class DataStore {
     if (!res.ok) throw new UpdateError('network', 'latest.json: HTTP ' + res.status);
     let m;
     try { m = await res.json(); } catch { throw new UpdateError('manifest', 'latest.json is not JSON'); }
-    return validateManifest(m);
+    validateManifest(m);
+    if (Object.keys(this.keys).length) await verifySignature(this.subtle, m, this.keys);
+    return m;
   }
 
   // Bring the device up to the published build. Resolves { status: 'current' | 'updated', manifest }, or rejects with

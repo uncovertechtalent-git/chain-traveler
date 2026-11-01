@@ -1,0 +1,19 @@
+{
+  "comment": "A manifest signed with a throwaway ECDSA P-256 key (made with openssl and build/manifest.py, the private key discarded). Both implementations must agree: Python's canonical bytes equal JSON.stringify of the sorted fields, and WebCrypto verifies the signature.",
+  "spki": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEkoFO+nDHlDph+uyjYMKxN+RgLFxRdgy3DB/F9X4ETUFrYOcDm9djp3y7/m3y60KrgSIe9vxhEL7TaODNqv2ESw==",
+  "canonical": "{\"built\":\"2026-11-01T09:13:30Z\",\"bytes\":5192595,\"date\":\"2026-11-01\",\"feedSha256\":\"96614516d1e2e19de46285dc952a09e33303d879f2b5091df743e215d194627d\",\"firstDate\":\"2026-10-31\",\"format\":1,\"kid\":\"5cdeb960\",\"metaBytes\":272715,\"metaSha256\":\"ba1ff1aec24ef163cb9a12c44c56f477e04820d93d23f7f2132fb65d5e1e420c\",\"nDays\":31,\"sha256\":\"6c24976feae737c479001c8fcc6e7a4ca8e451520558e2cbfd48c22773a6b9d8\"}",
+  "manifest": {
+    "format": 1,
+    "date": "2026-11-01",
+    "sha256": "6c24976feae737c479001c8fcc6e7a4ca8e451520558e2cbfd48c22773a6b9d8",
+    "bytes": 5192595,
+    "metaSha256": "ba1ff1aec24ef163cb9a12c44c56f477e04820d93d23f7f2132fb65d5e1e420c",
+    "metaBytes": 272715,
+    "firstDate": "2026-10-31",
+    "nDays": 31,
+    "built": "2026-11-01T09:13:30Z",
+    "feedSha256": "96614516d1e2e19de46285dc952a09e33303d879f2b5091df743e215d194627d",
+    "kid": "5cdeb960",
+    "sig": "OMyEyhkeq8JhQBDnD2Elo/sQ2LFBJEnBWjOu3oC7XdjBiuderasD/S3i0T1dkFLhvEFsA+teXQYZnXtY22qPgA=="
+  }
+}

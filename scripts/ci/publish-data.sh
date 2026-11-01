@@ -9,7 +9,10 @@
 #   2. refuse to overwrite data/<date>/ when it exists with other bytes (builds are immutable);
 #   3. upload the build under data/<date>/ with a one-year immutable Cache-Control;
 #   4. read it back and verify both files against the manifest;
-#   5. only then write data/latest.json (not cached at the edge), which is what makes the build current;
+#   5. only then write data/latest.json (not cached at the edge), which is what makes the build current. When
+#      SIGNING_KEY_ARN is set, the manifest is signed first (sign_pointer): it gets the key id and an ECDSA P-256
+#      signature made by that KMS key; the service must accept the signature, and the signature as shipped must verify
+#      against the public key with openssl, before the pointer moves;
 #   6. delete all but the newest KEEP builds (default 3), never the one just published.
 # The role behind this script may only touch data/* in the bucket (site-infra).
 #
@@ -29,6 +32,39 @@ upload_build_files() { # <dir> <bucket> <date>
     --content-type "application/octet-stream" --cache-control "public, max-age=31536000, immutable"
   aws s3 cp "$1/meta.json" "s3://$2/data/$3/meta.json" --only-show-errors \
     --content-type "application/json; charset=utf-8" --cache-control "public, max-age=31536000, immutable"
+}
+
+# Sign the manifest when a KMS key is configured: put the key id into it, sign its canonical form (build/manifest.py),
+# let KMS verify the signature, put the signature in as r|s, and verify that form again here with openssl. The data
+# role may use this one key and nothing else.
+# No key configured: the manifest stays unsigned (an app that holds no public key does not look for a signature).
+sign_pointer() { # <latest.json>
+  [ -n "${SIGNING_KEY_ARN:-}" ] || return 0
+  local f="$1" pub kid der tmp
+  tmp="$(mktemp -d)"
+  pub="$(aws kms get-public-key --key-id "$SIGNING_KEY_ARN" --query PublicKey --output text)"
+  kid="$(python3 -I "$manifest" kid-of "$pub")"
+  python3 -I "$manifest" set-kid "$f" "$kid"
+  python3 -I "$manifest" canonical "$f" > "$tmp/message"
+  der="$(aws kms sign --key-id "$SIGNING_KEY_ARN" --message "fileb://$tmp/message" --message-type RAW \
+    --signing-algorithm ECDSA_SHA_256 --query Signature --output text)"
+  python3 -I -c 'import base64,sys; sys.stdout.buffer.write(base64.b64decode(sys.argv[1], validate=True))' "$der" > "$tmp/signature"
+  if [ "$(aws kms verify --key-id "$SIGNING_KEY_ARN" --message "fileb://$tmp/message" --message-type RAW \
+      --signing-algorithm ECDSA_SHA_256 --signature "fileb://$tmp/signature" --query SignatureValid --output text)" != "True" ]; then
+    rm -rf "$tmp"
+    echo "::error::the signing key did not accept its own signature; the pointer was not written" >&2
+    return 1
+  fi
+  python3 -I "$manifest" attach-sig "$f" "$der"
+  # KMS checked the DER signature, but what ships is r|s from our own conversion: check that form against the public key
+  # with openssl, so a fault in the conversion cannot publish a signature that every app holding the key rejects.
+  if ! python3 -I "$manifest" verify-sig "$f" "$pub"; then
+    rm -rf "$tmp"
+    echo "::error::the signature as shipped (r|s) does not verify against the public key; the pointer was not written" >&2
+    return 1
+  fi
+  rm -rf "$tmp"
+  echo "signed the manifest with key $kid"
 }
 
 write_pointer() { # <latest.json> <bucket>
@@ -82,6 +118,7 @@ publish() {
   upload_build_files "$dist/data/$date" "$bucket" "$date"
   fetch_build "$bucket" "$date" "$tmp/readback" || { echo "::error::read-back of data/$date/ failed" >&2; return 1; }
   python3 -I "$manifest" check "$tmp/readback" "$dist/data/latest.json" >/dev/null
+  sign_pointer "$dist/data/latest.json"
   write_pointer "$dist/data/latest.json" "$bucket"
   echo "published build $date"
   summary "### Timetable publish" "" "- Published build \`$date\` ($(json_field "$dist/data/latest.json" bytes) bytes, sha256 \`$(json_field "$dist/data/latest.json" sha256 | cut -c1-12)\`)"
@@ -95,6 +132,7 @@ rollback() {
   fetch_build "$bucket" "$date" "$tmp/build" || { echo "::error::no build $date in the bucket" >&2; return 1; }
   out="$tmp/out"
   python3 -I "$manifest" make "$tmp/build" "$out" --date "$date" >/dev/null
+  sign_pointer "$out/data/latest.json"
   write_pointer "$out/data/latest.json" "$bucket"
   echo "latest.json now points at build $date"
   summary "### Timetable rollback" "" "- \`data/latest.json\` points at build \`$date\` again."
