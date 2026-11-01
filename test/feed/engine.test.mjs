@@ -34,6 +34,16 @@ function dayOn(wd, from = 3) {
 }
 const wednesday = dayOn(3), friday = dayOn(5);
 
+// The feed names a parent station in the local style ("Hauptbahnhof", "Feuersee") and its platforms with the city; the build
+// takes the name that carries the city (build/build_timetable.py station_name). Without it Stuttgart cannot be picked.
+test('stations carry their city: Stuttgart Hbf is there and no station is named by a kind of station alone', () => {
+  assert.ok(tt.names.includes('Stuttgart Hbf'), 'Stuttgart Hbf');
+  for (const bare of ['Hbf', 'Hauptbahnhof', 'Bahnhof']) assert.ok(!tt.names.includes(bare), 'a station named exactly ' + bare);
+  const found = tt.search('Stuttgart', 12).map(i => tt.names[i]);
+  assert.ok(found.length >= 6 && found.every(n => /Stuttgart/.test(n)), 'searching Stuttgart finds Stuttgart: ' + found.join(' | '));
+  assert.ok(tt.search('Stuttgart Hbf', 3).some(i => tt.names[i] === 'Stuttgart Hbf'));
+});
+
 test('the feed is a usable window: stations, connections and days', () => {
   assert.ok(tt.nStations >= 5000, 'stations ' + tt.nStations);
   assert.ok(tt.nConn >= 1000000, 'connections ' + tt.nConn);
