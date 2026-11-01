@@ -13,6 +13,7 @@ Usage:
   manifest.py make <built-dir> <out-dir> [--date YYYY-MM-DD]   write <out-dir>/data/<date>/ and <out-dir>/data/latest.json
   manifest.py feed-date <headers.txt>                          print the UTC date of the feed's Last-Modified header (nothing if there is none)
   manifest.py check <build-dir> <latest.json>                  verify a build directory against a manifest
+  manifest.py same <published-dir> <new-dir>                   verify that two build directories hold the same timetable (see same_build)
   manifest.py kid-of <base64-spki>                             print the key id (8 hex) of a public key
   manifest.py set-kid <latest.json> <kid>                      put the key id into the manifest (before it is signed)
   manifest.py canonical <latest.json>                          write the bytes that are signed to stdout
@@ -117,6 +118,30 @@ def check_build(build_dir, manifest):
         head = f.read(2)
     if head != b'\x1f\x8b':
         raise ValueError('timetable.bin.gz is not gzip')
+
+
+def meta_without_built(path):
+    """meta.json as data, without feed.built: the wall-clock time the build was made, which no rebuild repeats."""
+    with open(path, encoding='utf-8') as f:
+        meta = json.load(f)
+    if isinstance(meta, dict) and isinstance(meta.get('feed'), dict):
+        meta['feed'] = {k: v for k, v in meta['feed'].items() if k != 'built'}
+    return meta
+
+
+def same_build(published_dir, new_dir):
+    """Raise ValueError unless both directories hold the same timetable: timetable.bin.gz byte for byte, meta.json equal
+    in everything but feed.built. A rebuild of the same feed with the same code gives the same timetable.bin.gz and a
+    meta.json that differs only by that time, so such a rebuild is not another build: the published files stay as they
+    are (they are served as immutable for a year) and the pointer is made from them. Names the file that differs."""
+    for name in BUILD_FILES:
+        for d in (published_dir, new_dir):
+            if not os.path.isfile(os.path.join(d, name)):
+                raise ValueError('%s is missing from %s' % (name, d))
+    if sha256_file(os.path.join(published_dir, 'timetable.bin.gz')) != sha256_file(os.path.join(new_dir, 'timetable.bin.gz')):
+        raise ValueError('timetable.bin.gz: differs from the published file')
+    if meta_without_built(os.path.join(published_dir, 'meta.json')) != meta_without_built(os.path.join(new_dir, 'meta.json')):
+        raise ValueError('meta.json: differs from the published file in more than feed.built')
 
 
 def prune(dates, keep):
@@ -320,6 +345,13 @@ def cmd_check(args):
     print('ok')
 
 
+def cmd_same(args):
+    if len(args) != 2:
+        raise SystemExit(__doc__)
+    same_build(args[0], args[1])
+    print('ok')
+
+
 def cmd_prune(args):
     if len(args) < 1:
         raise SystemExit(__doc__)
@@ -328,10 +360,10 @@ def cmd_prune(args):
 
 
 def main(argv):
-    if len(argv) < 2 or argv[1] not in ('make', 'check', 'prune', 'feed-date', 'kid-of', 'set-kid', 'canonical', 'attach-sig', 'verify-sig'):
+    if len(argv) < 2 or argv[1] not in ('make', 'check', 'same', 'prune', 'feed-date', 'kid-of', 'set-kid', 'canonical', 'attach-sig', 'verify-sig'):
         raise SystemExit(__doc__)
     try:
-        {'make': cmd_make, 'check': cmd_check, 'prune': cmd_prune, 'feed-date': cmd_feed_date, 'kid-of': cmd_kid_of, 'set-kid': cmd_set_kid, 'canonical': cmd_canonical, 'attach-sig': cmd_attach_sig, 'verify-sig': cmd_verify_sig}[argv[1]](argv[2:])
+        {'make': cmd_make, 'check': cmd_check, 'same': cmd_same, 'prune': cmd_prune, 'feed-date': cmd_feed_date, 'kid-of': cmd_kid_of, 'set-kid': cmd_set_kid, 'canonical': cmd_canonical, 'attach-sig': cmd_attach_sig, 'verify-sig': cmd_verify_sig}[argv[1]](argv[2:])
     except (ValueError, KeyError, OSError) as e:
         print('error: %s' % e, file=sys.stderr)
         return 1

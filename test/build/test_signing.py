@@ -303,6 +303,19 @@ class SigningScriptTest(test_scripts.ScriptTest):
                 continue
             self.assertFalse(self.assert_valid_signature(p), field)
 
+    def test_a_rebuild_at_another_time_signs_the_pointer_of_the_published_files(self):
+        # the case that stopped the first signing: the build is published, and the rebuild of the same feed differs from it
+        # only by feed.built. The pointer is made from the published files, signed, and the signature covers them.
+        self.assertEqual(self.publish(self.make_dist('a', '2026-11-01T09:00:00Z', 'aa' * 32, stations=['Hbf'])).returncode, 0)
+        self.assertNotIn('sig', self.pointer())
+        meta = self.read('data/2026-11-01/meta.json')
+        r = self.signed_publish(self.make_dist('b', '2026-11-01T14:00:00Z', 'aa' * 32, stations=['Hbf']), REPUBLISH='1')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        p = self.pointer()
+        self.assertTrue(self.assert_valid_signature(p))
+        self.assertEqual((p['built'], p['metaSha256']), ('2026-11-01T09:00:00Z', hashlib.sha256(meta).hexdigest()))
+        self.assertEqual(self.read('data/2026-11-01/meta.json'), meta, 'the published meta.json is untouched')
+
     def test_unsigned_when_no_key_is_configured_and_no_kms_call_is_made(self):
         r = self.publish(self.make_dist('a', '2026-11-01T09:00:00Z', 'aa' * 32))
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)

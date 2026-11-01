@@ -220,8 +220,9 @@ How a timetable build moves, and what stops a bad one:
    `data/latest.json`: `{format, date, sha256, bytes, metaSha256, metaBytes, firstDate, nDays, built, feedSha256}`.
 3. **Publish job, no third-party code.** It downloads the artifact and checks it against the manifest, skips when
    the feed behind the current `latest.json` is unchanged (unless a run by hand asks to republish, step 5), refuses
-   to write a dated path that already holds other files (both files are compared with the manifest; when both are
-   identical there is nothing to upload and only the pointer moves), uploads `data/<date>/` with `Cache-Control: public, max-age=31536000, immutable`, reads it back and verifies it,
+   to write a dated path that already holds other files (the files there are compared with the build: `timetable.bin.gz` byte
+   for byte, `meta.json` in everything but `feed.built`, the time the build was made, which a rebuild never repeats; when
+   they are the same there is nothing to upload and only the pointer moves, made from the published files), uploads `data/<date>/` with `Cache-Control: public, max-age=31536000, immutable`, reads it back and verifies it,
    and only then writes `data/latest.json` (not cached at the edge). Then it deletes all but the newest three builds.
 4. **Rollback.** Run the Timetable workflow by hand with `rollback_to` set to a kept build (`YYYY-MM-DD`): the
    files are verified and `latest.json` points back at them. Nothing is deleted.
@@ -230,8 +231,9 @@ How a timetable build moves, and what stops a bad one:
    timetable is built from the same feed (the station names, say), which the daily run skips because the feed is
    unchanged. The build is dated by its feed (`data/<feed date>/`, plain `YYYY-MM-DD`: the app and its service worker
    match that shape, so there is no other naming), and nothing already published ever changes, because a dated
-   `meta.json` is cached for a year. The limit: when that path is already taken by a build with other files, the run
-   stops with "nothing already published ever changes" and the change waits for the next feed, which has another date.
+   `meta.json` is cached for a year. A rebuild of a published build with the same code is not another build (it differs only
+   by `feed.built`): the run keeps the published files and points, and signs, the pointer at them. The limit: when that path
+   is already taken by a build with another timetable or another `meta.json`, the run stops with "nothing already published ever changes" and the change waits for the next feed, which has another date.
    With the input unset a run behaves as before. The job summary says which path was taken: published, skipped,
    republished, nothing to upload, or refused.
 
@@ -289,7 +291,8 @@ that.
   the data-age line says `signature`. With no key listed the app checks hashes only, as before: that is how the shell
   ships before the key exists.
 - **Turn it on.** 1. Apply the signing key in site-infra (bootstrap, by the operator). 2. Set `SIGNING_KEY_ARN` and run
-  the timetable workflow by hand: the pointer now carries `kid` and `sig`, and an app that holds no key ignores both, so
+  the timetable workflow by hand with `rollback_to` set to the date of the live build (nothing is rebuilt or uploaded; the
+  pointer is made from the published files and signed): the pointer now carries `kid` and `sig`, and an app that holds no key ignores both, so
   nothing changes on a device. 3. Read the public key (`aws kms get-public-key`) and its id
   (`python3 build/manifest.py kid-of <base64 key>`), put them into `app/keys.js`, release the shell. The other order (the key
   in the app before the pointer is signed) opens a window in which a device that updates the shell finds an unsigned
