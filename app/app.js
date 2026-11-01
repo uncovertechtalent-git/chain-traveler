@@ -107,7 +107,7 @@ function renderChain(res, q) {
     }
     if (ld !== curDay) { curDay = ld; h += `<li class="wait"><b>${esc(dayName(q.day, l.dep))}</b></li>`; }
     if (l.walk) h += `<li class="leg walk">Walk ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="mute">${l.arr - l.dep} min</span></li>`;
-    else h += `<li class="leg"><span class="t">${hm(l.dep)}</span> ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="line">${esc(l.line)}</span><span class="t">${hm(l.arr)}</span> <span class="mute">towards ${esc(tt.names[l.term])}, ${dur(l.arr - l.dep)}</span> <button type="button" class="out" data-leg="${i}">This train is out</button></li>`;
+    else h += `<li class="leg"><span class="t">${hm(l.dep)}</span> ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="line">${esc(l.line)}</span><span class="t">${hm(l.arr)}</span> <span class="mute">towards ${esc(tt.names[l.term])}, ${dur(l.arr - l.dep)}</span> <button type="button" class="out" data-leg="${i}">This train is out?</button></li>`;
   });
   h += '</ol><details open><summary>Next trains at each stop</summary>';
   legs.forEach((l, i) => {
