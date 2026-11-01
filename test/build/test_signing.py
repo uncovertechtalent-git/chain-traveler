@@ -80,6 +80,117 @@ class DerTest(unittest.TestCase):
             with self.assertRaises(ValueError, msg=bad.hex()):
                 manifest.der_to_raw(bad)
 
+    def test_r_and_s_are_below_the_group_order_of_p256(self):
+        n = manifest.P256_ORDER
+        self.assertEqual(n, int('FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551', 16))
+        self.assertEqual(manifest.der_to_raw(sig_der(n - 1, n - 1)), (n - 1).to_bytes(32, 'big') * 2, 'the largest valid values')
+        for bad in (sig_der(n, 1), sig_der(1, n), sig_der(n + 1, 1), sig_der((1 << 256) - 1, 1), sig_der(1, (1 << 256) - 1)):
+            with self.assertRaises(ValueError, msg=bad.hex()):
+                manifest.der_to_raw(bad)
+
+
+class RawToDerTest(unittest.TestCase):
+    """The conversion back, written separately from der_to_raw: the helper sig_der above is the oracle."""
+
+    VALUES = (1, 2, 127, 128, 255, 256, (1 << 248) + 1, (1 << 255) - 1, 1 << 255, (1 << 255) + 1, manifest.P256_ORDER - 1)
+
+    def test_it_is_the_der_of_two_minimal_integers_whatever_the_values(self):
+        for r in self.VALUES:
+            for s in self.VALUES:
+                raw = r.to_bytes(32, 'big') + s.to_bytes(32, 'big')
+                self.assertEqual(manifest.raw_to_der(raw), sig_der(r, s), (r, s))
+
+    def test_it_undoes_der_to_raw(self):
+        for r in self.VALUES:
+            raw = r.to_bytes(32, 'big') + hashlib.sha256(b'%d' % r).digest()
+            if int.from_bytes(raw[32:], 'big') < manifest.P256_ORDER:
+                self.assertEqual(manifest.der_to_raw(manifest.raw_to_der(raw)), raw)
+
+    def test_only_64_bytes(self):
+        for n in (0, 63, 65, 72):
+            with self.assertRaises(ValueError):
+                manifest.raw_to_der(b'\x01' * n)
+
+    def test_a_pem_that_wraps_at_64_characters(self):
+        pem = manifest.spki_to_pem(bytes(range(100)))
+        lines = pem.split('\n')
+        self.assertEqual((lines[0], lines[-2], lines[-1]), ('-----BEGIN PUBLIC KEY-----', '-----END PUBLIC KEY-----', ''))
+        self.assertTrue(all(len(x) <= 64 for x in lines[1:-2]))
+        self.assertEqual(base64.b64decode(''.join(lines[1:-2])), bytes(range(100)))
+
+
+@unittest.skipUnless(HAVE_OPENSSL, 'the check runs openssl')
+class VerifySigTest(unittest.TestCase):
+    """The signature as it ships, checked by openssl against the public key."""
+
+    @classmethod
+    def make_key(cls, d, name):
+        pem = os.path.join(d, name + '.pem')
+        subprocess.run(['openssl', 'ecparam', '-name', 'prime256v1', '-genkey', '-noout', '-out', pem], check=True, capture_output=True)
+        spki = subprocess.run(['openssl', 'ec', '-in', pem, '-pubout', '-outform', 'DER'], check=True, capture_output=True).stdout
+        return pem, spki
+
+    def sign(self, pem, m):
+        msg = os.path.join(self.tmp, 'msg')
+        with open(msg, 'wb') as f:
+            f.write(manifest.canonical(m))
+        der = subprocess.run(['openssl', 'dgst', '-sha256', '-sign', pem, msg], check=True, capture_output=True).stdout
+        return base64.b64encode(manifest.der_to_raw(der)).decode()
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+        build = os.path.join(self.tmp, 'b')
+        test_scripts.write_build(build)
+        self.pem, self.spki = self.make_key(self.tmp, 'a')
+        self.other_pem, self.other_spki = self.make_key(self.tmp, 'b')
+        m = dict(manifest.make_manifest(build), kid=manifest.key_id(self.spki))
+        self.m = dict(m, sig=self.sign(self.pem, m))
+
+    def test_a_good_signature_verifies(self):
+        self.assertTrue(manifest.verify_sig(self.m, self.spki))
+
+    def test_many_signatures_verify_whatever_their_r_and_s(self):
+        # r and s of ECDSA are random: about half of them need DER padding, some are short. Every one must pass.
+        for i in range(40):
+            m = dict(self.m, bytes=i + 1)
+            m['sig'] = self.sign(self.pem, {k: v for k, v in m.items() if k != 'sig'})
+            self.assertTrue(manifest.verify_sig(m, self.spki), i)
+
+    def test_a_changed_field_a_flipped_bit_and_swapped_halves_do_not_verify(self):
+        raw = base64.b64decode(self.m['sig'])
+        flipped = bytes([raw[0] ^ 1]) + raw[1:]
+        for name, m in (('field', dict(self.m, bytes=self.m['bytes'] + 1)),
+                        ('bit', dict(self.m, sig=base64.b64encode(flipped).decode())),
+                        ('swapped', dict(self.m, sig=base64.b64encode(raw[32:] + raw[:32]).decode())),
+                        ('zeros', dict(self.m, sig=base64.b64encode(bytes(64)).decode()))):
+            self.assertFalse(manifest.verify_sig(m, self.spki), name)
+
+    def test_a_signature_by_another_key_does_not_verify_even_under_that_keys_id(self):
+        m = dict(self.m, kid=manifest.key_id(self.other_spki))
+        m['sig'] = self.sign(self.pem, {k: v for k, v in m.items() if k != 'sig'})
+        self.assertFalse(manifest.verify_sig(m, self.other_spki))
+
+    def test_a_key_id_that_does_not_name_the_key_is_an_error(self):
+        with self.assertRaisesRegex(ValueError, 'key id'):
+            manifest.verify_sig(self.m, self.other_spki)
+
+    def test_unsigned_and_malformed_signatures_are_errors(self):
+        for m in ({k: v for k, v in self.m.items() if k != 'sig'}, {k: v for k, v in self.m.items() if k != 'kid'},
+                  dict(self.m, sig=base64.b64encode(b'\x01' * 63).decode()), dict(self.m, sig='not base64!')):
+            with self.assertRaises(ValueError):
+                manifest.verify_sig(m, self.spki)
+
+    def test_the_command_says_yes_with_0_and_no_with_1(self):
+        path = os.path.join(self.tmp, 'latest.json')
+        manifest.write_json(path, self.m)
+        ok = subprocess.run([sys.executable, '-I', TOOL, 'verify-sig', path, base64.b64encode(self.spki).decode()], capture_output=True)
+        self.assertEqual((ok.returncode, ok.stdout.strip()), (0, b'the signature verifies'))
+        manifest.write_json(path, dict(self.m, bytes=self.m['bytes'] + 1))
+        bad = subprocess.run([sys.executable, '-I', TOOL, 'verify-sig', path, base64.b64encode(self.spki).decode()], capture_output=True)
+        self.assertEqual(bad.returncode, 1)
+        self.assertIn(b'does not verify', bad.stderr)
+
 
 class KeyIdTest(unittest.TestCase):
     def test_eight_hex_characters_of_the_sha256_of_the_key(self):
@@ -219,6 +330,32 @@ class SigningScriptTest(test_scripts.ScriptTest):
         self.assertNotEqual(r.returncode, 0)
         self.assertIn('did not accept its own signature', r.stderr)
         self.assertNotIn('data/latest.json', self.keys())
+
+    def test_a_signature_that_does_not_verify_is_caught_here_when_the_key_says_it_does(self):
+        # A fault in the conversion would pass KMS and ship a signature every keyed app rejects: the key vouches for
+        # whatever it is given, and the check with openssl at the end is the one that stops the publish.
+        r = self.signed_publish(self.make_dist('a', '2026-11-01T09:00:00Z', 'aa' * 32), FAKE_KMS_FAIL='lie')
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn('does not verify against the public key', r.stdout + r.stderr)
+        self.assertIn('the pointer was not written', r.stderr)
+        self.assertNotIn('data/latest.json', self.keys())
+        self.assertIn('kms-verify', [c['op'] for c in self.calls()], 'KMS did say yes: the stop is the local check')
+
+    def test_a_signature_that_does_not_verify_leaves_the_old_pointer_in_place(self):
+        self.assertEqual(self.signed_publish(self.make_dist('a', '2026-11-01T09:00:00Z', 'aa' * 32)).returncode, 0)
+        before = self.read('data/latest.json')
+        r = self.signed_publish(self.make_dist('b', '2026-11-02T09:00:00Z', 'bb' * 32), FAKE_KMS_FAIL='lie')
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(self.read('data/latest.json'), before)
+
+    def test_a_rollback_is_stopped_by_the_local_check_too(self):
+        self.assertEqual(self.signed_publish(self.make_dist('a', '2026-11-01T09:00:00Z', 'aa' * 32)).returncode, 0)
+        first = self.pointer()
+        self.assertEqual(self.signed_publish(self.make_dist('b', '2026-11-02T09:00:00Z', 'bb' * 32)).returncode, 0)
+        before = self.read('data/latest.json')
+        r = self.run_script(os.path.join(ROOT, 'scripts', 'ci', 'publish-data.sh'), 'rollback', first['date'], test_scripts.BUCKET, SIGNING_KEY_ARN=KEY_ARN, FAKE_KMS_FAIL='lie')
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(self.read('data/latest.json'), before)
 
     def test_a_failing_sign_leaves_the_old_pointer_in_place(self):
         self.assertEqual(self.signed_publish(self.make_dist('a', '2026-11-01T09:00:00Z', 'aa' * 32)).returncode, 0)

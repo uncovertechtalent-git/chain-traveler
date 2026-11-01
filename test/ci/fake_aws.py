@@ -9,7 +9,8 @@ Implements only what scripts/ci/*.sh call: `s3 cp`, `s3 ls [--recursive]`, `s3 r
   FAKE_CORRUPT_UPLOAD  if set, every upload stores one flipped byte (a damaged transfer)
   FAKE_KMS_KEY         PEM file of the EC private key behind every KMS key id
   FAKE_KMS_ALLOW_KEY   if set, KMS calls are refused for any other key id
-  FAKE_KMS_FAIL        sign: the sign call fails; verify: verify answers False
+  FAKE_KMS_FAIL        sign: the sign call fails; verify: verify answers False; lie: sign signs other bytes than it was given
+                       and verify answers True whatever it is given (a KMS that vouches for a signature that does not verify)
 Every call is appended to $FAKE_S3_ROOT/.calls.log, one JSON line each; metadata of uploads is kept in .meta/.
 """
 import base64
@@ -162,14 +163,23 @@ def kms(command, opts):
         if os.environ.get('FAKE_KMS_FAIL') == 'sign':
             print('An error occurred (KMSInternalException) when calling the Sign operation', file=sys.stderr)
             sys.exit(1)
-        r = openssl('dgst', '-sha256', '-sign', pem, fileb(opts['--message']))
+        message = fileb(opts['--message'])
+        if os.environ.get('FAKE_KMS_FAIL') == 'lie':
+            with open(message, 'rb') as f:
+                other = f.read() + b'\0'
+            with tempfile.NamedTemporaryFile() as t:
+                t.write(other)
+                t.flush()
+                r = openssl('dgst', '-sha256', '-sign', pem, t.name)
+        else:
+            r = openssl('dgst', '-sha256', '-sign', pem, message)
         print(base64.b64encode(r.stdout).decode())
     elif command == 'verify':
         with tempfile.TemporaryDirectory() as d:
             pub = os.path.join(d, 'pub.pem')
             openssl('ec', '-in', pem, '-pubout', '-out', pub)
             ok = openssl('dgst', '-sha256', '-verify', pub, '-signature', fileb(opts['--signature']), fileb(opts['--message'])).returncode == 0
-        print('True' if ok and os.environ.get('FAKE_KMS_FAIL') != 'verify' else 'False')
+        print('True' if (ok and os.environ.get('FAKE_KMS_FAIL') != 'verify') or os.environ.get('FAKE_KMS_FAIL') == 'lie' else 'False')
     else:
         sys.exit(2)
 

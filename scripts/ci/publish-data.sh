@@ -11,7 +11,8 @@
 #   4. read it back and verify both files against the manifest;
 #   5. only then write data/latest.json (not cached at the edge), which is what makes the build current. When
 #      SIGNING_KEY_ARN is set, the manifest is signed first (sign_pointer): it gets the key id and an ECDSA P-256
-#      signature made by that KMS key, and the service must accept the signature before the pointer moves;
+#      signature made by that KMS key; the service must accept the signature, and the signature as shipped must verify
+#      against the public key with openssl, before the pointer moves;
 #   6. delete all but the newest KEEP builds (default 3), never the one just published.
 # The role behind this script may only touch data/* in the bucket (site-infra).
 #
@@ -34,7 +35,7 @@ upload_build_files() { # <dir> <bucket> <date>
 }
 
 # Sign the manifest when a KMS key is configured: put the key id into it, sign its canonical form (build/manifest.py),
-# let KMS verify the signature, then put the signature in. The data role may use this one key and nothing else.
+# let KMS verify the signature, put the signature in as r|s and verify that form again here with openssl. The data role may use this one key and nothing else.
 # No key configured: the manifest stays unsigned (an app that holds no public key does not look for a signature).
 sign_pointer() { # <latest.json>
   [ -n "${SIGNING_KEY_ARN:-}" ] || return 0
@@ -54,6 +55,13 @@ sign_pointer() { # <latest.json>
     return 1
   fi
   python3 -I "$manifest" attach-sig "$f" "$der"
+  # KMS checked the DER signature, but what ships is r|s from our own conversion: check that form against the public key
+  # with openssl, so a fault in the conversion cannot publish a signature that every app holding the key rejects.
+  if ! python3 -I "$manifest" verify-sig "$f" "$pub"; then
+    rm -rf "$tmp"
+    echo "::error::the signature as shipped (r|s) does not verify against the public key; the pointer was not written" >&2
+    return 1
+  fi
   rm -rf "$tmp"
   echo "signed the manifest with key $kid"
 }

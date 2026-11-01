@@ -17,6 +17,7 @@ Usage:
   manifest.py set-kid <latest.json> <kid>                      put the key id into the manifest (before it is signed)
   manifest.py canonical <latest.json>                          write the bytes that are signed to stdout
   manifest.py attach-sig <latest.json> <base64-der-signature>  put the signature (raw r|s, base64) into the manifest
+  manifest.py verify-sig <latest.json> <base64-spki>           check the signature as shipped against the public key with openssl
   manifest.py prune <keep> <date> [<date> ...]                 print the dates to delete, oldest first, keeping the newest <keep>
 """
 import base64
@@ -27,7 +28,9 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
+import tempfile
 
 FORMAT = 1
 BUILD_FILES = ('timetable.bin.gz', 'meta.json')
@@ -35,6 +38,7 @@ DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 SHA_RE = re.compile(r'^[0-9a-f]{64}$')
 KID_RE = re.compile(r'^[0-9a-f]{8}$')
 MAGIC = b'CHT1'
+P256_ORDER = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551   # n: r and s of an ECDSA P-256 signature are in 1..n-1
 
 
 def sha256_file(path):
@@ -180,10 +184,49 @@ def der_to_raw(der):
         raise ValueError('not a DER signature')
     r, i = read_int(der, i)
     s, i = read_int(der, i)
-    if i != len(der) or not (0 < r < 1 << 256 and 0 < s < 1 << 256):
+    if i != len(der) or not (0 < r < P256_ORDER and 0 < s < P256_ORDER):
         raise ValueError('not a P-256 signature')
     return r.to_bytes(32, 'big') + s.to_bytes(32, 'big')
 
+
+def raw_to_der(raw):
+    """r|s (64 bytes) back to DER, the form openssl checks. Written from the DER rules on its own, not as the inverse of
+    der_to_raw, so that publish-data.sh can check the shipped form with something other than the conversion that made it."""
+    if len(raw) != 64:
+        raise ValueError('the signature is not 64 bytes')
+
+    def der_int(b):
+        b = b.lstrip(b'\0') or b'\0'
+        if b[0] & 0x80:
+            b = b'\0' + b
+        return b'\x02' + bytes([len(b)]) + b
+
+    body = der_int(raw[:32]) + der_int(raw[32:])
+    return b'\x30' + bytes([len(body)]) + body
+
+
+def spki_to_pem(spki_der):
+    b64 = base64.b64encode(spki_der).decode('ascii')
+    return '-----BEGIN PUBLIC KEY-----\n' + '\n'.join(b64[i:i + 64] for i in range(0, len(b64), 64)) + '\n-----END PUBLIC KEY-----\n'
+
+
+def verify_sig(manifest, spki_der):
+    """True when the signature in the manifest, as it ships (base64 of r|s), is a valid ECDSA P-256 signature over
+    canonical(manifest) by the public key (SubjectPublicKeyInfo, DER), checked with the openssl CLI. A manifest that is not
+    signed, a signature of the wrong length and a key id that does not name this key are errors, not False."""
+    if 'sig' not in manifest or 'kid' not in manifest:
+        raise ValueError('the manifest is not signed')
+    raw = base64.b64decode(manifest['sig'], validate=True)
+    if manifest['kid'] != key_id(spki_der):
+        raise ValueError('the key id of the manifest does not name this public key')
+    with tempfile.TemporaryDirectory() as d:
+        files = {'pub.pem': spki_to_pem(spki_der).encode('ascii'), 'sig.der': raw_to_der(raw), 'msg': canonical(manifest)}
+        for name, data in files.items():
+            with open(os.path.join(d, name), 'wb') as f:
+                f.write(data)
+        r = subprocess.run(['openssl', 'dgst', '-sha256', '-verify', os.path.join(d, 'pub.pem'), '-signature', os.path.join(d, 'sig.der'),
+                            os.path.join(d, 'msg')], capture_output=True)
+    return r.returncode == 0
 
 def key_id(spki_der):
     """Short id of a public key: the first 8 hex characters of the sha256 of its SubjectPublicKeyInfo."""
@@ -261,6 +304,14 @@ def cmd_attach_sig(args):
     write_json(args[0], m)
 
 
+def cmd_verify_sig(args):
+    if len(args) != 2:
+        raise SystemExit(__doc__)
+    if not verify_sig(_load(args[0]), base64.b64decode(args[1], validate=True)):
+        raise ValueError('the signature does not verify against the public key')
+    print('the signature verifies')
+
+
 def cmd_check(args):
     if len(args) != 2:
         raise SystemExit(__doc__)
@@ -277,10 +328,10 @@ def cmd_prune(args):
 
 
 def main(argv):
-    if len(argv) < 2 or argv[1] not in ('make', 'check', 'prune', 'feed-date', 'kid-of', 'set-kid', 'canonical', 'attach-sig'):
+    if len(argv) < 2 or argv[1] not in ('make', 'check', 'prune', 'feed-date', 'kid-of', 'set-kid', 'canonical', 'attach-sig', 'verify-sig'):
         raise SystemExit(__doc__)
     try:
-        {'make': cmd_make, 'check': cmd_check, 'prune': cmd_prune, 'feed-date': cmd_feed_date, 'kid-of': cmd_kid_of, 'set-kid': cmd_set_kid, 'canonical': cmd_canonical, 'attach-sig': cmd_attach_sig}[argv[1]](argv[2:])
+        {'make': cmd_make, 'check': cmd_check, 'prune': cmd_prune, 'feed-date': cmd_feed_date, 'kid-of': cmd_kid_of, 'set-kid': cmd_set_kid, 'canonical': cmd_canonical, 'attach-sig': cmd_attach_sig, 'verify-sig': cmd_verify_sig}[argv[1]](argv[2:])
     except (ValueError, KeyError, OSError) as e:
         print('error: %s' % e, file=sys.stderr)
         return 1

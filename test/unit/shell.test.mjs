@@ -56,7 +56,7 @@ test('every local file the page names exists', () => {
 });
 
 test('the app makes no network request except to its own files', () => {
-  for (const f of ['app.js', 'data-store.js', 'sw.js', 'engine.js', 'planb.js', 'graph.js', 'live.js', 'navigate.js', 'i18n.js', 'notfound.js', 'keys.js', ...fs.readdirSync(path.join(app, 'locales')).map(f => 'locales/' + f)]) {
+  for (const f of ['app.js', 'data-store.js', 'sw.js', 'engine.js', 'planb.js', 'graph.js', 'zoomview.js', 'basemap-data.js', 'live.js', 'navigate.js', 'i18n.js', 'notfound.js', 'keys.js', ...fs.readdirSync(path.join(app, 'locales')).map(f => 'locales/' + f)]) {
     assert.ok(!/https?:\/\//.test(read(f).replace(/\/\/ .*$/gm, '')), f + ' names an absolute URL');
   }
 });
