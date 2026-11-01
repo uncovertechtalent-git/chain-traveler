@@ -14,11 +14,21 @@ failures of the first day left in).
 
 ## What it does
 
+The page opens on Plan B. One bar above the tabs says where you are, where you are going, the day and the time, and every tab
+reads it, so no tab keeps an answer to a question that was asked a while ago: change a station in Plan B and the chain, the
+departures and the reach map are about the new one. The bar has a "Use my location" button and a "Now" box. With "Now" on, the
+day and the time follow the clock of Germany, and the Plan B list is drawn again when the minute moves; a day or a time set by
+hand turns it off. A start that came from the device's position is read again when the page is shown again, if the device
+allowed it already (no question is asked on its own), and is dropped at the next visit if the device will not say it again,
+because an "I am at" from yesterday is wrong. A station that was picked stays. The stop-over, the minimum stay and "Plan chain"
+are in the Chain tab; the minimum change is under the bar. `app/here.js` holds the rules (the clock of Germany, what a tick
+changes, what becomes of a position from the last visit) as plain functions with tests.
+
 | Screen | What you get |
 |---|---|
 | Chain | Earliest chain of trains from a start to a target station after a time, on a chosen date. Optional stop-over with a minimum stay: it arrives at the stop-over as early as possible, waits out the stay, then chains onward as early as possible. Walks between nearby stations, tight changes flagged, and the next trains at every stop so you can swap the plan on the day. |
 | Reach map | Every station as a dot, coloured by how soon you can be there from the start. Click a dot to chain a trip there. |
-| Departures | The next trains at any station after a time. |
+| Departures | The next trains at the station you are at, after the time of the bar. |
 | Plan B | "My train is out." From where you are, now, to where you are going: the ways on, each set against your plan, drawn as a graph (stations at their real positions, green, amber and red for how late, line thickness for trains an hour) and listed with their changes and tightest change. Press "This train is out?" on a leg of a chain to start from there, or open the tab and say where you are, by name or with "Use my location". |
 
 ## Run it

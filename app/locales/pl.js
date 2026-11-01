@@ -2,7 +2,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Język',
-  'meta.sub': 'Ułóż łańcuch z kolejnych pociągów regionalnych między dowolnymi stacjami w Niemczech na Deutschlandticket, z postojem tam, gdzie zechcesz. Godziny planowe, odczytywane offline z rozkładu na tym urządzeniu.',
+  'meta.sub': 'Plan B na Deutschlandticket: gdy pociąg regionalny jest odwołany, zobacz wszystkie opcje dalszej jazdy stąd, gdzie jesteś. Albo ułóż łańcuch pociągów między dowolnymi stacjami w Niemczech. Godziny planowe, odczytywane offline z rozkładu na tym urządzeniu.',
   'status.loading': 'Wczytywanie rozkładu...',
   'status.first': 'Pierwsze wczytywanie rozkładu (ok. 5 MB)...',
   'status.loadFailed': 'Nie udało się wczytać rozkładu ({message}). Pierwsze uruchomienie wymaga połączenia z internetem.',
@@ -24,10 +24,9 @@ export default {
   // ---- the trip form
   'aria.trip': 'Podróż',
   'field.station': 'Stacja',
-  'field.start': 'Skąd',
   'field.date': 'Data',
-  'field.leaveAfter': 'Wyjazd po',
-  'field.target': 'Dokąd',
+  'field.time': 'Godzina',
+  'field.now': 'Teraz',
   'field.via': 'Postój (opcjonalnie)',
   'field.stay': 'Min. czas postoju (min)',
   'field.change': 'Min. czas przesiadki (min)',
@@ -68,8 +67,7 @@ export default {
   'reach.note': 'Każda kropka to stacja osiągalna pociągiem regionalnym. Kolor pokazuje, jak szybko możesz tam dotrzeć ze stacji początkowej. Kliknij kropkę, aby ułożyć tam łańcuch.',
 
   // ---- departures
-  'field.after': 'Po godz.',
-  'deps.pick': 'Wybierz stację.',
+  'deps.pick': 'Wybierz stację powyżej, aby zobaczyć jej odjazdy.',
   'deps.none': 'Brak odjazdów po tej godzinie.',
   'deps.th.departs': 'Odjazd',
   'deps.th.line': 'Linia',
@@ -79,7 +77,6 @@ export default {
   // ---- Plan B
   'live.intro': 'Pociąg odwołany? Podaj, gdzie jesteś i dokąd jedziesz. Zobaczysz opcje dalszej jazdy stąd, każdą porównaną z planem, oraz ile pociągów na godzinę kursuje na każdym odcinku.',
   'field.iAmAt': 'Jestem na stacji',
-  'field.timeNow': 'Obecna godzina',
   'field.goingTo': 'Jadę do',
   'field.plannedArr': 'Planowany przyjazd (opcjonalnie)',
   'btn.locate': 'Użyj mojej lokalizacji',

@@ -4,7 +4,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Dil',
-  'meta.sub': 'Deutschlandticket ile herhangi iki Alman istasyonu arasında sıradaki bölgesel trenleri zincirleyin; dilediğiniz yerde mola verin. Planlanan saatler, bu cihazdaki sefer saatlerinden çevrimdışı okunur.',
+  'meta.sub': 'Deutschlandticket için Plan B: bölgesel treniniz iptal olduğunda bulunduğunuz yerden devam etme seçeneklerinin hepsini görün. Ya da herhangi iki Alman istasyonu arasında trenleri zincirleyin. Planlanan saatler, bu cihazdaki sefer saatlerinden çevrimdışı okunur.',
   'status.loading': 'Sefer saatleri yükleniyor...',
   'status.first': 'Sefer saatleri ilk kez yükleniyor (yaklaşık 5 MB)...',
   'status.loadFailed': 'Sefer saatleri yüklenemedi ({message}). İlk açılış için internet bağlantısı gerekir.',
@@ -26,10 +26,9 @@ export default {
   // ---- the trip form
   'aria.trip': 'Yolculuk',
   'field.station': 'İstasyon',
-  'field.start': 'Başlangıç',
   'field.date': 'Tarih',
-  'field.leaveAfter': 'En erken kalkış',
-  'field.target': 'Hedef',
+  'field.time': 'Saat',
+  'field.now': 'Şimdi',
   'field.via': 'Mola (isteğe bağlı)',
   'field.stay': 'En az mola süresi (dk)',
   'field.change': 'En az aktarma süresi (dk)',
@@ -70,8 +69,7 @@ export default {
   'reach.note': 'Her nokta, bölgesel trenle ulaşılabilen bir istasyondur. Renk, başlangıç istasyonundan oraya ne kadar çabuk varabileceğinizi gösterir. Oraya zincir planlamak için bir noktaya tıklayın.',
 
   // ---- departures
-  'field.after': 'Şu saatten sonra',
-  'deps.pick': 'Bir istasyon seçin.',
+  'deps.pick': 'Kalkışlarını görmek için yukarıdan bir istasyon seçin.',
   'deps.none': 'Bu saatten sonra kalkış yok.',
   'deps.th.departs': 'Kalkış',
   'deps.th.line': 'Hat',
@@ -81,7 +79,6 @@ export default {
   // ---- Plan B
   'live.intro': 'Treniniz iptal mi? Nerede olduğunuzu ve nereye gittiğinizi belirtin. Buradan devam etme seçeneklerini, planınızla karşılaştırmalı olarak ve her bölümde saatte kaç tren olduğuyla birlikte görürsünüz.',
   'field.iAmAt': 'Bulunduğum yer',
-  'field.timeNow': 'Şu anki saat',
   'field.goingTo': 'Gideceğim yer',
   'field.plannedArr': 'Planlanan varış (isteğe bağlı)',
   'btn.locate': 'Konumumu kullan',

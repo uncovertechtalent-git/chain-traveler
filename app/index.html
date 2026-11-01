@@ -20,29 +20,6 @@
   </header>
 
   <main id="app" hidden>
-    <section class="card" aria-label="Trip" data-i18n-aria="aria.trip">
-      <div class="controls">
-        <label class="wide"><span data-i18n="field.start">Start</span>
-          <span class="pick"><input id="src" autocomplete="off" spellcheck="false" placeholder="Station" data-i18n-ph="field.station"><ul class="sugg" hidden></ul></span>
-        </label>
-        <label><span data-i18n="field.date">Date</span><select id="date"></select></label>
-        <label><span data-i18n="field.leaveAfter">Leave after</span><input id="t0" type="time" value="06:00"></label>
-        <label class="wide"><span data-i18n="field.target">Target</span>
-          <span class="pick"><input id="dst" autocomplete="off" spellcheck="false" placeholder="Station" data-i18n-ph="field.station"><ul class="sugg" hidden></ul></span>
-        </label>
-        <label class="wide"><span data-i18n="field.via">Stop-over (optional)</span>
-          <span class="pick"><input id="via" autocomplete="off" spellcheck="false" placeholder="Station" data-i18n-ph="field.station"><ul class="sugg" hidden></ul></span>
-        </label>
-        <label><span data-i18n="field.stay">Minimum stay (min)</span><input id="stay" type="number" min="0" step="15" value="180"></label>
-        <label><span data-i18n="field.change">Minimum change (min)</span><input id="tr" type="number" min="0" max="20" value="4"></label>
-      </div>
-      <div class="actions">
-        <button id="plan" type="button" class="primary" data-i18n="btn.plan">Plan chain</button>
-        <button id="swap" type="button" data-i18n="btn.swap">Swap start and target</button>
-        <button id="clearvia" type="button" data-i18n="btn.clearvia">No stop-over</button>
-      </div>
-    </section>
-
     <div id="navwrap" hidden>
       <section id="navcard" class="card navcard" aria-live="polite"></section>
       <details class="note navtest"><summary data-i18n="nav.test">Test the clock</summary>
@@ -50,14 +27,57 @@
       </details>
     </div>
 
+    <section class="card herecard" aria-label="Trip" data-i18n-aria="aria.trip">
+      <div class="controls">
+        <label class="wide"><span data-i18n="field.iAmAt">I am at</span>
+          <span class="pick"><input id="src" autocomplete="off" spellcheck="false" placeholder="Station" data-i18n-ph="field.station"><ul class="sugg" hidden></ul></span>
+        </label>
+        <label class="wide"><span data-i18n="field.goingTo">Going to</span>
+          <span class="pick"><input id="dst" autocomplete="off" spellcheck="false" placeholder="Station" data-i18n-ph="field.station"><ul class="sugg" hidden></ul></span>
+        </label>
+        <label><span data-i18n="field.date">Date</span><select id="date"></select></label>
+        <label><span data-i18n="field.time">Time</span><input id="t0" type="time" value="06:00"></label>
+      </div>
+      <div class="where"><button id="llocate" type="button" class="primary" data-i18n="btn.locate">Use my location</button> <label class="outl nowbox"><input id="nowon" type="checkbox" checked> <span data-i18n="field.now">Now</span></label> <span id="lwhere" class="note" aria-live="polite"></span></div>
+      <details class="note moreopts"><summary data-i18n="field.change">Minimum change (min)</summary>
+        <input id="tr" type="number" min="0" max="20" value="4" aria-label="Minimum change (min)" data-i18n-aria="field.change">
+      </details>
+    </section>
+
     <nav class="tabs" role="tablist">
-      <button role="tab" id="tab-chain" aria-selected="true" data-i18n="tab.chain">Chain</button>
-      <button role="tab" id="tab-reach" aria-selected="false" data-i18n="tab.reach">Reach map</button>
+      <button role="tab" id="tab-live" aria-selected="true" data-i18n="tab.live">Plan B</button>
+      <button role="tab" id="tab-chain" aria-selected="false" data-i18n="tab.chain">Chain</button>
       <button role="tab" id="tab-deps" aria-selected="false" data-i18n="tab.deps">Departures</button>
-      <button role="tab" id="tab-live" aria-selected="false" data-i18n="tab.live">Plan B</button>
+      <button role="tab" id="tab-reach" aria-selected="false" data-i18n="tab.reach">Reach map</button>
     </nav>
 
-    <section id="pane-chain" class="card" role="tabpanel" aria-live="polite"></section>
+    <section id="pane-live" class="card" role="tabpanel">
+      <p class="note lead" data-i18n="live.intro">Your train is out? Say where you are and where you are going. You get the ways on from here, each set against your plan, and how many trains an hour stand behind every leg.</p>
+      <div class="controls">
+        <label><span data-i18n="field.plannedArr">Planned arrival (optional)</span><input id="lplan" type="time"></label>
+      </div>
+      <div id="ldeps"></div>
+      <div id="lres" aria-live="polite"></div>
+    </section>
+
+    <section id="pane-chain" class="card" role="tabpanel" hidden>
+      <div class="controls">
+        <label class="wide"><span data-i18n="field.via">Stop-over (optional)</span>
+          <span class="pick"><input id="via" autocomplete="off" spellcheck="false" placeholder="Station" data-i18n-ph="field.station"><ul class="sugg" hidden></ul></span>
+        </label>
+        <label><span data-i18n="field.stay">Minimum stay (min)</span><input id="stay" type="number" min="0" step="15" value="180"></label>
+      </div>
+      <div class="actions">
+        <button id="plan" type="button" class="primary" data-i18n="btn.plan">Plan chain</button>
+        <button id="swap" type="button" data-i18n="btn.swap">Swap start and target</button>
+        <button id="clearvia" type="button" data-i18n="btn.clearvia">No stop-over</button>
+      </div>
+      <div id="chainres" aria-live="polite"></div>
+    </section>
+
+    <section id="pane-deps" class="card" role="tabpanel" hidden>
+      <div id="deplist" aria-live="polite"></div>
+    </section>
 
     <section id="pane-reach" class="card" role="tabpanel" hidden>
       <div class="reachbar">
@@ -68,34 +88,6 @@
       </div>
       <div class="mapbox"><canvas id="map"></canvas><div id="tip" class="tip" hidden></div></div>
       <p class="note" data-i18n="reach.note">Every dot is a station reachable by regional train. Colour shows how soon you can be there from the start station. Click a dot to chain a trip there.</p>
-    </section>
-
-    <section id="pane-deps" class="card" role="tabpanel" hidden>
-      <div class="controls">
-        <label class="wide"><span data-i18n="field.station">Station</span>
-          <span class="pick"><input id="dstation" autocomplete="off" spellcheck="false" placeholder="Station" data-i18n-ph="field.station"><ul class="sugg" hidden></ul></span>
-        </label>
-        <label><span data-i18n="field.after">After</span><input id="dtime" type="time" value="06:00"></label>
-      </div>
-      <div id="deplist"></div>
-    </section>
-
-    <section id="pane-live" class="card" role="tabpanel" hidden>
-      <p class="note lead" data-i18n="live.intro">Your train is out? Say where you are and where you are going. You get the ways on from here, each set against your plan, and how many trains an hour stand behind every leg.</p>
-      <div class="controls">
-        <label class="wide"><span data-i18n="field.iAmAt">I am at</span>
-          <span class="pick"><input id="lsrc" autocomplete="off" spellcheck="false" placeholder="Station" data-i18n-ph="field.station"><ul class="sugg" hidden></ul></span>
-        </label>
-        <label><span data-i18n="field.date">Date</span><select id="ldate"></select></label>
-        <label><span data-i18n="field.timeNow">Time now</span><input id="lt0" type="time"></label>
-        <label class="wide"><span data-i18n="field.goingTo">Going to</span>
-          <span class="pick"><input id="ldst" autocomplete="off" spellcheck="false" placeholder="Station" data-i18n-ph="field.station"><ul class="sugg" hidden></ul></span>
-        </label>
-        <label><span data-i18n="field.plannedArr">Planned arrival (optional)</span><input id="lplan" type="time"></label>
-      </div>
-      <div class="where"><button id="llocate" type="button" data-i18n="btn.locate">Use my location</button> <span id="lwhere" class="note" aria-live="polite"></span></div>
-      <div id="ldeps"></div>
-      <div id="lres" aria-live="polite"></div>
     </section>
   </main>
 
