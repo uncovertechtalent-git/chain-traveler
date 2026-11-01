@@ -13,6 +13,8 @@
 export const MANIFEST_FORMAT = 1;
 export const MAX_BYTES = 64 * 1024 * 1024;         // refuse a manifest that promises more than this
 const POINTER_CACHE = 'ct-data-pointer';
+// The store reads back what it wrote, by URL. A CDN's Vary header must not turn that into a miss (see app/sw.js).
+const MATCH = { ignoreVary: true };
 const BUILD_PREFIX = 'ct-data-';
 const SHA_RE = /^[0-9a-f]{64}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -97,13 +99,13 @@ export class DataStore {
   // every read, so a damaged or tampered cache entry is dropped instead of being used.
   async load() {
     const pointerCache = await this.caches.open(POINTER_CACHE);
-    const hit = await pointerCache.match(this.pointerUrl());
+    const hit = await pointerCache.match(this.pointerUrl(), MATCH);
     if (!hit) return null;
     let manifest;
     try { manifest = validateManifest(await hit.json()); } catch { await this.forget(); return null; }
     try {
       const cache = await this.caches.open(this.buildCacheName(manifest));
-      const [binRes, metaRes] = await Promise.all([cache.match(this.buildUrl(manifest, 'timetable.bin.gz')), cache.match(this.buildUrl(manifest, 'meta.json'))]);
+      const [binRes, metaRes] = await Promise.all([cache.match(this.buildUrl(manifest, 'timetable.bin.gz'), MATCH), cache.match(this.buildUrl(manifest, 'meta.json'), MATCH)]);
       if (!binRes || !metaRes) throw new UpdateError('verify', 'build files missing');
       const [bin, metaBytes] = await Promise.all([binRes.arrayBuffer(), metaRes.arrayBuffer()]);
       await verifyBytes(this.subtle, bin, manifest.sha256, manifest.bytes, 'timetable.bin.gz');
@@ -139,7 +141,7 @@ export class DataStore {
   async runUpdate() {
     const remote = await this.fetchManifest();
     const pointerCache = await this.caches.open(POINTER_CACHE);
-    const hit = await pointerCache.match(this.pointerUrl());
+    const hit = await pointerCache.match(this.pointerUrl(), MATCH);
     let local = null;
     if (hit) { try { local = validateManifest(await hit.json()); } catch { local = null; } }
     if (compareManifest(local, remote) === 'same' && (await this.load())) return { status: 'current', manifest: remote };
