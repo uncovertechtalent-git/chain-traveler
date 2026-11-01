@@ -22,9 +22,10 @@ input,select{font:inherit;font-size:16px;color:var(--text);background:var(--bg);
 button{font:inherit;cursor:pointer;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 14px;min-height:40px}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
 button:hover{filter:brightness(.97)}
-.tabs{display:flex;gap:6px;margin:0 0 10px}
+.tabs{display:flex;gap:6px;margin:0}
 .tabs button{border-radius:8px 8px 0 0;border-bottom:none;color:var(--muted)}
-.tabs button[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--text);font-weight:600}
+.tabs button[aria-selected="true"]{position:relative;z-index:1;margin-bottom:-1px;background:var(--surface);border-color:var(--line);box-shadow:inset 0 2px 0 var(--accent);color:var(--text);font-weight:600}
+[role="tabpanel"]{border-top-left-radius:0}
 .sum{display:flex;flex-wrap:wrap;gap:6px 22px;margin:0 0 12px}
 .sum b{font-size:1.2rem}
 .sum span{color:var(--muted);font-size:.85rem}
@@ -70,7 +71,7 @@ th{color:var(--muted);font-weight:500}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--good:#4ad295;--mid:#f0b34a;--bad:#f27b6b;--ghost:#9a978d}}
 :root[data-theme="dark"]{--good:#4ad295;--mid:#f0b34a;--bad:#f27b6b;--ghost:#9a978d}
 .tabs{flex-wrap:wrap}
-@media (max-width:480px){.tabs{gap:4px}.tabs button{padding:7px 10px;font-size:.9rem}}
+@media (max-width:480px){.tabs{flex-wrap:nowrap;gap:3px}.tabs button{flex:1 1 auto;min-width:0;padding:6px 4px;font-size:.85rem;line-height:1.2;overflow-wrap:anywhere}}
 button.out{min-height:26px;padding:1px 10px;font-size:.76rem;margin-left:4px;color:var(--bad);border-color:var(--bad);background:transparent}
 .lead{margin:0 0 12px}
 .lead2{margin:12px 0 8px;font-weight:600}
@@ -157,3 +158,26 @@ button.follow{margin-top:8px}
 .herecard .moreopts{margin-top:8px}
 .herecard .moreopts input{max-width:8rem;margin-top:6px}
 @media (max-width:480px){.herecard .controls{grid-template-columns:1fr 1fr}.herecard .controls .wide{grid-column:span 2}}
+/* a phone: a grid column may be narrower than the content of its widest item (iOS gives a time field a width of its own),
+   so the columns can shrink and the fields fit the card */
+@media (max-width:480px){.herecard .controls{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.controls>label{min-width:0}
+input[type="time"],input[type="date"]{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none;text-align:left}
+input[type="time"]::-webkit-date-and-time-value{text-align:left}
+/* the departures: four columns that share the width of the card and wrap, instead of a table wider than the screen */
+table.deps{table-layout:fixed}
+table.deps td{overflow-wrap:anywhere}
+table.deps th{overflow-wrap:normal}
+table.deps .dt{width:4rem}
+table.deps .dl{width:4.6rem}
+@media (max-width:480px){table.deps td,table.deps th{padding:5px 3px;font-size:.85rem}table.deps .dt{width:3.7rem}table.deps .dl{width:3.9rem}table.deps .line{margin:0}}
+/* the light/dark switch: the native controls follow the theme, and the button shows the theme it would switch to */
+:root{color-scheme:light dark}
+:root[data-theme="light"]{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
+.topctl{display:flex;align-items:center;gap:8px}
+.themebtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;min-height:36px;padding:0;flex:0 0 auto}
+.themebtn .sun{display:none}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .themebtn .sun{display:block}:root:not([data-theme="light"]) .themebtn .moon{display:none}}
+:root[data-theme="dark"] .themebtn .sun{display:block}
+:root[data-theme="dark"] .themebtn .moon{display:none}

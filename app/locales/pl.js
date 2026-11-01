@@ -2,6 +2,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Język',
+  'theme.toggle': 'Tryb jasny lub ciemny',
   'meta.sub': 'Plan B na Deutschlandticket: gdy pociąg regionalny jest odwołany, zobacz wszystkie opcje dalszej jazdy stąd, gdzie jesteś. Albo ułóż łańcuch pociągów między dowolnymi stacjami w Niemczech. Godziny planowe, odczytywane offline z rozkładu na tym urządzeniu.',
   'status.loading': 'Wczytywanie rozkładu...',
   'status.first': 'Pierwsze wczytywanie rozkładu (ok. 5 MB)...',
@@ -75,10 +76,9 @@ export default {
   'deps.th.next': 'Następny przystanek',
 
   // ---- Plan B
-  'live.intro': 'Pociąg odwołany? Podaj, gdzie jesteś i dokąd jedziesz. Zobaczysz opcje dalszej jazdy stąd, każdą porównaną z planem, oraz ile pociągów na godzinę kursuje na każdym odcinku.',
+  'live.intro': 'Pociąg odwołany? Podaj, gdzie jesteś i dokąd jedziesz. Zobaczysz opcje dalszej jazdy stąd, każdą z godziną przyjazdu i o ile później niż najlepsza, oraz ile pociągów na godzinę kursuje na każdym odcinku.',
   'field.iAmAt': 'Jestem na stacji',
   'field.goingTo': 'Jadę do',
-  'field.plannedArr': 'Planowany przyjazd (opcjonalnie)',
   'btn.locate': 'Użyj mojej lokalizacji',
   'live.say': 'Podaj, gdzie jesteś i dokąd jedziesz.',
   'live.depsTitle': 'Pociągi ze stacji {station} po {time}',
@@ -92,7 +92,7 @@ export default {
   },
   'live.leadPlan': 'Plan zakładał przyjazd o {plan}. Najlepsza opcja dalszej jazdy daje przyjazd o {best}{later}.',
   'live.later': ', {dur} później',
-  'live.leadBest': 'Nie podano planowanego przyjazdu, więc punktem odniesienia jest najlepsza opcja dalszej jazdy (przyjazd {best}).',
+  'live.leadBest': 'Najlepsza opcja dalszej jazdy przyjeżdża o {best}; pozostałe porównano z nią.',
   'graph.label': 'Opcje dalszej jazdy: {from} – {to}',
 
   // ---- Plan B: how a way compares

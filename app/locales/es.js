@@ -2,6 +2,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Idioma',
+  'theme.toggle': 'Modo claro u oscuro',
   'meta.sub': 'Plan B para el Deutschlandticket: cuando tu tren regional se cancela, mira todas las alternativas para seguir desde donde estás. O encadena trenes entre dos estaciones alemanas cualesquiera. Horas previstas, leídas sin conexión de los horarios guardados en este dispositivo.',
   'status.loading': 'Cargando los horarios...',
   'status.first': 'Cargando los horarios por primera vez (unos 5 MB)...',
@@ -75,10 +76,9 @@ export default {
   'deps.th.next': 'Próxima parada',
 
   // ---- Plan B
-  'live.intro': '¿Tu tren está cancelado? Indica dónde estás y adónde vas. Verás las alternativas para seguir desde aquí, cada una comparada con tu plan, y cuántos trenes por hora hay en cada tramo.',
+  'live.intro': '¿Tu tren está cancelado? Indica dónde estás y adónde vas. Verás las alternativas para seguir desde aquí, cada una con su hora de llegada y cuánto más tarde que la mejor, y cuántos trenes por hora hay en cada tramo.',
   'field.iAmAt': 'Estoy en',
   'field.goingTo': 'Voy a',
-  'field.plannedArr': 'Llegada prevista (opcional)',
   'btn.locate': 'Usar mi ubicación',
   'live.say': 'Indica dónde estás y adónde vas.',
   'live.depsTitle': 'Trenes desde {station} a partir de {time}',
@@ -87,7 +87,7 @@ export default {
   'live.unlisted': { one: '{n} tren más marcado antes como cancelado, no está en esta lista.', other: '{n} trenes más marcados antes como cancelados, no están en esta lista.' },
   'live.leadPlan': 'Llegada según tu plan: {plan}. Mejor alternativa para seguir: llegada {best}{later}.',
   'live.later': ', {dur} más tarde',
-  'live.leadBest': 'No indicaste una llegada prevista, así que la mejor alternativa (llegada {best}) sirve de referencia.',
+  'live.leadBest': 'La mejor alternativa llega a las {best}; las demás se comparan con ella.',
   'graph.label': 'Alternativas de {from} a {to}',
 
   // ---- Plan B: how a way compares

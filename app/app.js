@@ -5,6 +5,7 @@ import { MANIFEST_KEYS } from './keys.js';
 import { initLive } from './live.js';
 import { initNavigate } from './navigate.js';
 import { berlinClock, tick as clockStep, atLaunch, onReturn, migrate } from './here.js';
+import { initTheme } from './theme.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -272,7 +273,7 @@ function drawDeps() {
   const day = +$('#date').value, t = toMin($('#t0').value);
   const deps = tt.departures({ day, station: s, t, limit: 14 });
   out.innerHTML = deps.length
-    ? `<table><tr><th>${th('deps.th.departs')}</th><th>${th('deps.th.line')}</th><th>${th('deps.th.towards')}</th><th>${th('deps.th.next')}</th></tr>${deps.map(d => `<tr><td class="t">${hm(d.dep)}${d.dep >= 1440 ? ' <span class="mute">' + esc(dayName(day, d.dep)) + '</span>' : ''}</td><td><span class="line">${esc(d.line)}</span></td><td>${esc(tt.names[d.term])}</td><td class="mute">${esc(tt.names[d.next])} ${hm(d.arr)}</td></tr>`).join('')}</table>`
+    ? `<table class="deps"><tr><th class="dt">${th('deps.th.departs')}</th><th class="dl">${th('deps.th.line')}</th><th>${th('deps.th.towards')}</th><th>${th('deps.th.next')}</th></tr>${deps.map(d => `<tr><td class="t">${hm(d.dep)}${d.dep >= 1440 ? ' <span class="mute">' + esc(dayName(day, d.dep)) + '</span>' : ''}</td><td><span class="line">${esc(d.line)}</span></td><td>${esc(tt.names[d.term])}</td><td class="mute">${esc(tt.names[d.next])} ${hm(d.arr)}</td></tr>`).join('')}</table>`
     : `<p class="note">${th('deps.none')}</p>`;
 }
 
@@ -466,6 +467,7 @@ async function start() {
   const status = $('#status');
   state = loadState();
   buildLangSelect();
+  initTheme($('#theme'));
   onLang(refreshLanguage);
   await setLang(initialLang(), { save: false });
   status.textContent = t('status.loading');

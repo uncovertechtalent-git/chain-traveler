@@ -3,6 +3,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Limbă',
+  'theme.toggle': 'Mod luminos sau întunecat',
   'meta.sub': 'Planul B pentru Deutschlandticket: când trenul regional este anulat, vedeți toate variantele de continuare de acolo unde vă aflați. Sau legați în lanț trenuri între oricare două gări germane. Ore planificate, citite offline din orarul de pe acest dispozitiv.',
   'status.loading': 'Se încarcă orarul...',
   'status.first': 'Se încarcă orarul pentru prima dată (aproximativ 5 MB)...',
@@ -76,10 +77,9 @@ export default {
   'deps.th.next': 'Următoarea oprire',
 
   // ---- Plan B
-  'live.intro': 'Trenul dvs. este anulat? Spuneți unde vă aflați și încotro mergeți. Primiți variantele de continuare de aici, fiecare raportată la planul dvs., și câte trenuri pe oră circulă pe fiecare tronson.',
+  'live.intro': 'Trenul dvs. este anulat? Spuneți unde vă aflați și încotro mergeți. Primiți variantele de continuare de aici, fiecare cu ora sosirii și cu cât mai târziu decât cea mai bună, și câte trenuri pe oră circulă pe fiecare tronson.',
   'field.iAmAt': 'Mă aflu la',
   'field.goingTo': 'Merg spre',
-  'field.plannedArr': 'Sosire planificată (opțional)',
   'btn.locate': 'Folosiți locația mea',
   'live.say': 'Spuneți unde vă aflați și încotro mergeți.',
   'live.depsTitle': 'Trenuri din {station} după {time}',
@@ -92,7 +92,7 @@ export default {
   },
   'live.leadPlan': 'Planul dvs. prevedea sosirea la {plan}. Cea mai bună variantă acum ajunge la {best}{later}.',
   'live.later': ', cu {dur} mai târziu',
-  'live.leadBest': 'Nu ați indicat o sosire planificată, așa că reperul este cea mai bună variantă (sosire la {best}).',
+  'live.leadBest': 'Cea mai bună variantă ajunge la {best}; celelalte sunt raportate la ea.',
   'graph.label': 'Variante de la {from} la {to}',
 
   // ---- Plan B: how a way compares

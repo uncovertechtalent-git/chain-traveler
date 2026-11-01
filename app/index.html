@@ -8,11 +8,12 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
+<script src="theme-boot.js"></script>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="top"><h1>Chain Traveler</h1><select id="lang" class="langsel" aria-label="Language" data-i18n-aria="lang.label"></select></div>
+    <div class="top"><h1>Chain Traveler</h1><div class="topctl"><select id="lang" class="langsel" aria-label="Language" data-i18n-aria="lang.label"></select><button id="theme" type="button" class="themebtn" aria-label="Light or dark mode" aria-pressed="false" data-i18n-aria="theme.toggle"><svg class="sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button></div></div>
     <p class="sub" data-i18n="meta.sub">Chain the next regional trains between any two German stations on the Deutschlandticket, with a stop-over wherever you like. Planned times, read offline from the timetable on this device.</p>
     <p id="status" class="status">Loading the timetable...</p>
     <button id="retry" type="button" data-i18n="btn.retry" hidden>Try again</button>
@@ -53,9 +54,6 @@
 
     <section id="pane-live" class="card" role="tabpanel">
       <p class="note lead" data-i18n="live.intro">Your train is out? Say where you are and where you are going. You get the ways on from here, each set against your plan, and how many trains an hour stand behind every leg.</p>
-      <div class="controls">
-        <label><span data-i18n="field.plannedArr">Planned arrival (optional)</span><input id="lplan" type="time"></label>
-      </div>
       <div id="ldeps"></div>
       <div id="lres" aria-live="polite"></div>
     </section>
