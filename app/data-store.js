@@ -73,12 +73,12 @@ export function describeAge(manifest, today) {
   const last = isoOf(dayNumber(manifest.firstDate) + manifest.nDays - 1);
   const left = dayNumber(last) - dayNumber(today);
   if (left < 0) {
-    return { level: 'expired', last, text: `The timetable ended on ${last}. Trains after that date are not in it; connect to the internet to update.` };
+    return { level: 'expired', last, left, text: `The timetable ended on ${last}. Trains after that date are not in it; connect to the internet to update.` };
   }
   if (left <= 3) {
-    return { level: 'soon', last, text: `Timetable of ${manifest.date}, valid until ${last} (${left === 0 ? 'last day' : left + ' more day' + (left === 1 ? '' : 's')}). It updates itself when you are online.` };
+    return { level: 'soon', last, left, text: `Timetable of ${manifest.date}, valid until ${last} (${left === 0 ? 'last day' : left + ' more day' + (left === 1 ? '' : 's')}). It updates itself when you are online.` };
   }
-  return { level: 'ok', last, text: `Timetable of ${manifest.date}, valid until ${last}.` };
+  return { level: 'ok', last, left, text: `Timetable of ${manifest.date}, valid until ${last}.` };
 }
 
 export class DataStore {

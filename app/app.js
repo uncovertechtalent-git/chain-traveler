@@ -1,4 +1,5 @@
-import { Timetable, fmt, dur, INF } from './engine.js';
+import { Timetable, fmt, INF } from './engine.js';
+import { t, th, raw, dur, minutes, num, dayLabel, errText, setLang, initialLang, onLang, applyStatic, LANGS, lang } from './i18n.js';
 import { DataStore, gunzip, describeAge } from './data-store.js';
 import { initLive } from './live.js';
 
@@ -67,22 +68,21 @@ function runPlan() {
   if (q.src < 0 || q.dst < 0) {
     const started = $('#src').value.trim() || $('#dst').value.trim();
     out.innerHTML = started
-      ? '<div class="err">Pick a start and a target station from the suggestions.</div>'
-      : '<p class="note">Pick a start and a target station to chain the next regional trains between them.</p>';
+      ? `<div class="err">${th('chain.pickBoth')}</div>`
+      : `<p class="note">${th('chain.intro')}</p>`;
     lastPlan = null;
     return;
   }
   const res = tt.plan({ day: q.day, src: q.src, dst: q.dst, t0: q.t0, via: q.via, stayMin: q.stay, minTransfer: q.tr });
   lastPlan = { res, q };
   reachCache = null;
-  if (res.error) { out.innerHTML = `<div class="err">${esc(res.error)}</div>`; if (!$('#pane-reach').hidden) drawReach(); return; }
+  if (res.error) { out.innerHTML = `<div class="err">${esc(errText(res))}</div>`; if (!$('#pane-reach').hidden) drawReach(); return; }
   out.innerHTML = renderChain(res, q);
   if (!$('#pane-reach').hidden) drawReach();
 }
 
 const hm = m => fmt(((m % 1440) + 1440) % 1440);
-const dayName = (day, m) => new Date(tt.dateOf(day + Math.floor(m / 1440)) + 'T12:00:00Z')
-  .toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+const dayName = (day, m) => dayLabel(tt.dateOf(day + Math.floor(m / 1440)));
 
 function renderChain(res, q) {
   const legs = res.legs, first = legs[0], last = legs[legs.length - 1];
@@ -90,11 +90,11 @@ function renderChain(res, q) {
   const changes = Math.max(0, rides - 1 - res.stays.length);
   const day0 = Math.floor(first.dep / 1440);
   let h = '';
-  if (day0 > 0) h += `<div class="err">No usable train from ${esc(tt.names[q.src])} on ${esc(dayName(q.day, 0))} after ${hm(q.t0)}. The first chain leaves on ${esc(dayName(q.day, first.dep))}.</div>`;
+  if (day0 > 0) h += `<div class="err">${th('chain.noTrainToday', { from: tt.names[q.src], day: dayName(q.day, 0), time: hm(q.t0), first: dayName(q.day, first.dep) })}</div>`;
   const arrDay = Math.floor(last.arr / 1440) > day0 ? ` (${dayName(q.day, last.arr)})` : '';
-  h += `<div class="sum"><div><b>${hm(first.dep)} to ${hm(last.arr)}${esc(arrDay)}</b><br><span>${esc(tt.names[q.src])} to ${esc(tt.names[q.dst])}</span></div>
-    <div><b>${dur(last.arr - first.dep)}</b><br><span>on the way</span></div>
-    <div><b>${changes}</b><br><span>change${changes === 1 ? '' : 's'}${res.stays.length ? ' plus the stop-over' : ''}</span></div></div><ol class="chain">`;
+  h += `<div class="sum"><div><b>${th('chain.timeRange', { dep: hm(first.dep), arr: hm(last.arr) })}${esc(arrDay)}</b><br><span>${th('leg.fromTo', { from: tt.names[q.src], to: tt.names[q.dst] })}</span></div>
+    <div><b>${esc(dur(last.arr - first.dep))}</b><br><span>${th('chain.onTheWay')}</span></div>
+    <div><b>${changes}</b><br><span>${th(res.stays.length ? 'chain.changesStop' : 'chain.changes', { n: changes })}</span></div></div><ol class="chain">`;
   let curDay = day0;
   if (day0 > 0) h += `<li class="wait">${esc(dayName(q.day, first.dep))}</li>`;
   legs.forEach((l, i) => {
@@ -102,22 +102,22 @@ function renderChain(res, q) {
     if (i > 0) {
       const p = legs[i - 1];
       const st = res.stays.find(s => s.station === l.from && p.to === l.from && Math.abs(s.dep - l.dep) < 1);
-      if (st) h += `<li class="stay">Stop-over in <b>${esc(tt.names[st.station])}</b>: arrive <span class="t">${hm(st.arr)}</span>, leave <span class="t">${hm(st.dep)}</span> (${dur(st.dep - st.arr)})</li>`;
-      else if (!l.walk && !p.walk) { const w = l.dep - p.arr; const tight = w <= q.tr + 2; h += `<li class="wait${tight ? ' tight' : ''}">${w} min at ${esc(tt.names[l.from])}${tight ? ' (tight change)' : ''}</li>`; }
+      if (st) h += `<li class="stay">${th('chain.stay', { station: raw(`<b>${esc(tt.names[st.station])}</b>`), arr: raw(`<span class="t">${hm(st.arr)}</span>`), dep: raw(`<span class="t">${hm(st.dep)}</span>`), dur: dur(st.dep - st.arr) })}</li>`;
+      else if (!l.walk && !p.walk) { const w = l.dep - p.arr; const tight = w <= q.tr + 2; h += `<li class="wait${tight ? ' tight' : ''}">${th(tight ? 'chain.waitTight' : 'chain.wait', { min: minutes(w), station: tt.names[l.from] })}</li>`; }
     }
     if (ld !== curDay) { curDay = ld; h += `<li class="wait"><b>${esc(dayName(q.day, l.dep))}</b></li>`; }
-    if (l.walk) h += `<li class="leg walk">Walk ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="mute">${l.arr - l.dep} min</span></li>`;
-    else h += `<li class="leg"><span class="t">${hm(l.dep)}</span> ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="line">${esc(l.line)}</span><span class="t">${hm(l.arr)}</span> <span class="mute">towards ${esc(tt.names[l.term])}, ${dur(l.arr - l.dep)}</span> <button type="button" class="out" data-leg="${i}">This train is out?</button></li>`;
+    if (l.walk) h += `<li class="leg walk">${th('chain.walk', { from: tt.names[l.from], to: tt.names[l.to] })} <span class="mute">${esc(minutes(l.arr - l.dep))}</span></li>`;
+    else h += `<li class="leg"><span class="t">${hm(l.dep)}</span> ${th('leg.fromTo', { from: tt.names[l.from], to: tt.names[l.to] })} <span class="line">${esc(l.line)}</span><span class="t">${hm(l.arr)}</span> <span class="mute">${th('leg.towards', { term: tt.names[l.term], dur: dur(l.arr - l.dep) })}</span> <button type="button" class="out" data-leg="${i}">${th('btn.out')}</button></li>`;
   });
-  h += '</ol><details open><summary>Next trains at each stop</summary>';
+  h += `</ol><details open><summary>${th('chain.nextTrains')}</summary>`;
   legs.forEach((l, i) => {
     const nxt = legs.slice(i + 1).find(x => !x.walk);
     if (!nxt) return;
     const dep = tt.departures({ day: q.day, station: nxt.from, t: l.arr + q.tr, limit: 6 });
-    h += `<div class="stop"><h3>${esc(tt.names[nxt.from])} <span class="mute">(arrive ${hm(l.arr)})</span></h3><ul>`;
+    h += `<div class="stop"><h3>${esc(tt.names[nxt.from])} <span class="mute">${th('chain.arrive', { time: hm(l.arr) })}</span></h3><ul>`;
     for (const d of dep) {
       const mine = d.line === nxt.line && Math.abs(d.dep - nxt.dep) < 1;
-      h += `<li class="${mine ? 'mine' : ''}"><span class="t">${hm(d.dep)}</span><span class="line">${esc(d.line)}</span> towards ${esc(tt.names[d.term])} <span class="mute">next stop ${esc(tt.names[d.next])}</span></li>`;
+      h += `<li class="${mine ? 'mine' : ''}"><span class="t">${hm(d.dep)}</span><span class="line">${esc(d.line)}</span> ${th('dep.towards', { term: tt.names[d.term] })} <span class="mute">${th('dep.nextStop', { stop: tt.names[d.next] })}</span></li>`;
     }
     h += '</ul></div>';
   });
@@ -191,12 +191,12 @@ function nearestPt(ev) {
 function drawDeps() {
   const s = pDep.get();
   const out = $('#deplist');
-  if (s < 0) { out.innerHTML = '<p class="note">Pick a station.</p>'; return; }
+  if (s < 0) { out.innerHTML = `<p class="note">${th('deps.pick')}</p>`; return; }
   const day = +$('#date').value, t = toMin($('#dtime').value);
   const deps = tt.departures({ day, station: s, t, limit: 14 });
   out.innerHTML = deps.length
-    ? `<table><tr><th>Departs</th><th>Line</th><th>Towards</th><th>Next stop</th></tr>${deps.map(d => `<tr><td class="t">${hm(d.dep)}${d.dep >= 1440 ? ' <span class="mute">' + esc(dayName(day, d.dep)) + '</span>' : ''}</td><td><span class="line">${esc(d.line)}</span></td><td>${esc(tt.names[d.term])}</td><td class="mute">${esc(tt.names[d.next])} ${hm(d.arr)}</td></tr>`).join('')}</table>`
-    : '<p class="note">No departures after that time.</p>';
+    ? `<table><tr><th>${th('deps.th.departs')}</th><th>${th('deps.th.line')}</th><th>${th('deps.th.towards')}</th><th>${th('deps.th.next')}</th></tr>${deps.map(d => `<tr><td class="t">${hm(d.dep)}${d.dep >= 1440 ? ' <span class="mute">' + esc(dayName(day, d.dep)) + '</span>' : ''}</td><td><span class="line">${esc(d.line)}</span></td><td>${esc(tt.names[d.term])}</td><td class="mute">${esc(tt.names[d.next])} ${hm(d.arr)}</td></tr>`).join('')}</table>`
+    : `<p class="note">${th('deps.none')}</p>`;
 }
 
 // ---- tabs ----
@@ -214,12 +214,24 @@ function showTab(name) {
 const berlinToday = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' });
 const SIX_HOURS = 6 * 3600 * 1000;
 
-function showAge(note) {
+// The line under the title: how old the timetable is, and optionally one note (a key of the locale, with params).
+let lastAge = { note: '', params: {} };
+function showAge(note, params = {}) {
+  lastAge = { note: note || '', params };
   const el = $('#dataage');
   const a = describeAge(manifest, berlinToday());
-  el.textContent = note ? `${a.text} ${note}` : a.text;
+  const base = a.level === 'expired' ? t('age.expired', { last: a.last })
+    : a.level === 'soon' ? t('age.soon', { date: manifest.date, last: a.last, left: a.left === 0 ? t('age.lastDay') : t('age.moreDays', { n: a.left }) })
+      : t('age.ok', { date: manifest.date, last: a.last });
+  el.textContent = note ? `${base} ${t(note, params)}` : base;
   el.dataset.level = a.level;
   el.hidden = false;
+}
+
+function renderFoot() {
+  if (!tt) return;
+  const f = tt.meta.feed;
+  $('#foot').textContent = t('foot', { publisher: f.publisher, license: f.license, stations: num(tt.nStations), connections: num(tt.nConn), first: tt.dateOf(0), last: tt.dateOf(tt.nDays - 1) });
 }
 
 function fillDates(wantedIso) { fillDateSelect($('#date'), wantedIso); }
@@ -228,8 +240,7 @@ function fillDateSelect(sel, wantedIso) {
   sel.innerHTML = '';
   for (let d = 0; d < tt.nDays; d++) {
     const iso = tt.dateOf(d);
-    const label = new Date(iso + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
-    sel.add(new Option(label, d));
+    sel.add(new Option(dayLabel(iso), d));
   }
   const inWindow = iso => iso && tt.dayIndex(iso) >= 0 && tt.dayIndex(iso) < tt.nDays;
   const today = berlinToday();
@@ -250,8 +261,7 @@ function adopt(cur, next) {
   if (!uiReady) initUi();
   pSrc.set(tt.find(keep.src)); pDst.set(tt.find(keep.dst)); pVia.set(keep.via ? tt.find(keep.via) : -1); pDep.set(keep.dep ? tt.find(keep.dep) : -1);
   live.onTimetable();
-  const f = tt.meta.feed;
-  $('#foot').textContent = `Timetable: ${f.publisher}, ${f.license}. ${tt.nStations.toLocaleString('en')} stations, ${tt.nConn.toLocaleString('en')} connections, ${tt.dateOf(0)} to ${tt.dateOf(tt.nDays - 1)}. Planned times only, no delays or engineering works. Check the trip in DB Navigator before you travel.`;
+  renderFoot();
   $('#status').hidden = true;
   $('#retry').hidden = true;
   $('#app').hidden = false;
@@ -267,23 +277,23 @@ async function useBuild(cur) {
 // On an online launch, and when the device comes back online or the app is reopened after hours: ask the CDN
 // whether a newer build exists, and swap it in only after it has been verified (app/data-store.js).
 async function checkForUpdate() {
-  if (navigator.onLine === false) { if (manifest) showAge('Offline: using the timetable on this device.'); return; }
+  if (navigator.onLine === false) { if (manifest) showAge('age.offline'); return; }
   lastCheck = Date.now();
   try {
     const r = await store.update();
     if (r.status === 'updated') {
       const cur = await store.load();
-      if (cur) { await useBuild(cur); showAge('Updated just now.'); }
+      if (cur) { await useBuild(cur); showAge('age.updated'); }
     } else if (manifest) {
-      showAge('Up to date.');
+      showAge('age.upToDate');
     }
   } catch (e) {
     if (!manifest) {
       $('#status').hidden = false;
-      $('#status').textContent = `The timetable could not be loaded (${e.message}). The first launch needs an internet connection.`;
+      $('#status').textContent = t('status.loadFailed', { message: e.message });
       $('#retry').hidden = false;
     } else {
-      showAge(`Could not check for a newer timetable (${e.code || 'error'}); the data on this device is unchanged.`);
+      showAge('age.checkFailed', { code: e.code || 'error' });
     }
   }
 }
@@ -314,6 +324,7 @@ function initUi() {
     live.fromChain(lastPlan, +b.dataset.leg);
   });
   $('#hrs').addEventListener('input', () => { $('#hrs-val').textContent = $('#hrs').value; drawReach(); });
+  paintReachLabel();
   $('#dtime').addEventListener('change', drawDeps);
   $('#date').addEventListener('change', drawDeps);
   window.addEventListener('resize', () => { if (!$('#pane-reach').hidden) drawReach(); });
@@ -333,23 +344,51 @@ function initUi() {
   });
 }
 
+// The language switch. The select lists every language by its own name; the choice is kept on the device.
+function buildLangSelect() {
+  const sel = $('#lang');
+  for (const [c, name] of LANGS) sel.add(new Option(name, c));
+  sel.onchange = () => setLang(sel.value);
+}
+
+function paintReachLabel() {
+  $('#reach-label').innerHTML = th('reach.within', { hours: raw(`<b id="hrs-val">${esc($('#hrs').value)}</b>`) });
+}
+
+// A language was chosen: everything that holds words is drawn again; the stations, the date and the plan stay.
+function refreshLanguage() {
+  $('#lang').value = lang();
+  paintReachLabel();
+  if (!tt || !uiReady) return;
+  fillDates(tt.dateOf(+$('#date').value));
+  live.refresh();
+  renderFoot();
+  if (manifest) showAge(lastAge.note, lastAge.params);
+  runPlan();
+  if (!$('#pane-deps').hidden) drawDeps();
+}
+
 async function start() {
   const status = $('#status');
   state = loadState();
+  buildLangSelect();
+  onLang(refreshLanguage);
+  await setLang(initialLang(), { save: false });
+  status.textContent = t('status.loading');
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
   if (!('caches' in self) || !(crypto && crypto.subtle)) {
-    status.textContent = 'This browser cannot keep the timetable on the device (it needs Cache Storage over HTTPS). Try a current browser.';
+    status.textContent = t('status.noCache');
     return;
   }
   store = new DataStore({ caches: self.caches, fetch: (u, i) => fetch(u, i), subtle: crypto.subtle, base: new URL('./', location.href).href });
-  $('#retry').onclick = () => { status.textContent = 'Loading the timetable...'; $('#retry').hidden = true; checkForUpdate(); };
+  $('#retry').onclick = () => { status.textContent = t('status.loading'); $('#retry').hidden = true; checkForUpdate(); };
   window.addEventListener('online', checkForUpdate);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastCheck > SIX_HOURS) checkForUpdate(); });
 
   let cur = null;
-  try { cur = await store.load(); } catch (e) { status.textContent = 'The stored timetable could not be read: ' + e.message; }
+  try { cur = await store.load(); } catch (e) { status.textContent = t('status.readFailed', { message: e.message }); }
   if (cur) await useBuild(cur);
-  else status.textContent = 'Loading the timetable for the first time (about 5 MB)...';
+  else status.textContent = t('status.first');
   await checkForUpdate();
 }
 

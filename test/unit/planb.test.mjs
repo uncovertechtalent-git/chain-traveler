@@ -87,7 +87,7 @@ test('with the planned train out, the detour keeps the plan and the next regular
   assert.deepEqual(r.options[0].legs.map(l => l.line), ['RB', 'RE', 'S5']);
   assert.deepEqual(r.options[1].legs.map(l => l.line), ['RB36', 'RE30', 'S5']);
   assert.equal(r.baseKind, 'plan');
-  assert.deepEqual(r.options[0].tags, ['Earliest arrival']);
+  assert.deepEqual(r.options[0].tags, ['earliest']);
 });
 
 test('every way carries its changes, its tightest change and the trains an hour behind each leg', () => {
