@@ -7,7 +7,8 @@ Output: <out>/meta.json          station names and positions, line labels, feed 
 
 Every consecutive stop pair of every trip becomes one connection (from, to, dep, arr, trip, flags).
 Times are whole minutes after midnight of the service day and may exceed 1440. A trip carries a
-bitmask of the days (from firstDate) it runs on. Platforms are merged into their parent station.
+bitmask of the days (from firstDate) it runs on. Platforms are merged into their parent station; the station
+is named by its parent, or by its platforms where they carry the city and the parent does not (station_name).
 Stations within 300 m of each other get a footpath so a change between them is possible.
 
 Run it with:  python3 -I build/build_timetable.py <feed-dir> <out-dir>
@@ -49,6 +50,58 @@ def clean_name(name):
     n = name.replace('Hauptbahnhof', 'Hbf')
     m = re.match(r'^([^,]+), (.+)$', n)
     return (m.group(1) + ' ' + m.group(2)) if m else n
+
+
+# Words that say what kind of station it is and not where it is. A parent station named with nothing else ("Hauptbahnhof",
+# "Stadtmitte", "Hbf (tief)") has lost its city: the regional style of the feed puts the city only on its platforms.
+GENERIC_WORDS = frozenset(w.lower() for w in (
+    'Hbf', 'Hauptbahnhof', 'Bahnhof', 'Bf', 'Bhf', 'Hp', 'Haltepunkt', 'Stadtmitte', 'Mitte', 'Zentrum', 'Markt', 'Rathaus',
+    'Nord', 'Süd', 'Ost', 'West', 'Nordbahnhof', 'Südbahnhof', 'Ostbahnhof', 'Westbahnhof',
+))
+
+
+def is_bare(name):
+    """True when the name is made only of generic words (anything in parentheses is left out): no place in it."""
+    words = [w for w in re.split(r'[\s/,.\-]+', re.sub(r'\([^)]*\)', ' ', name)) if w]
+    return bool(words) and all(w.lower() in GENERIC_WORDS for w in words)
+
+
+def extends(full, base):
+    """True when full is base with something in front of it, set off by a space, a hyphen or the like:
+    'Stuttgart Hbf' and 'Esslingen-Zell' extend 'Hbf' and 'Zell', 'Reinord' does not extend 'Nord'."""
+    return bool(base) and len(full) > len(base) and full.lower().endswith(base.lower()) and not full[-len(base) - 1].isalnum()
+
+
+def station_name(parent_name, kid_names):
+    """The shown name of a station: its parent's name, cleaned, unless the platforms say more.
+
+    The feed names a parent station in the local style ("Hauptbahnhof", "Feuersee") and its platforms with the city
+    ("Stuttgart Hbf", "Stuttgart Feuersee"), in the regions where that is the habit. A name without its city cannot be
+    found by the city and is shared by dozens of stations, so the platforms' name wins when it carries more:
+      - a parent named with generic words only (is_bare) takes the commonest platform name that extends it, the
+        shortest of those when equally common; platform names that do not extend it ("Stuttgart Central Station
+        (FlixTrain)") are ignored. With no platform name that extends it ("Ostbahnhof" and "München Ost") it takes
+        the commonest platform name that is not itself made of generic words: a parent with only a kind of station
+        for a name never wins over a platform name that carries a place;
+      - any other parent takes the platforms' name only when every platform has that one name and it extends the
+        parent's, so a station that has a platform named like itself, or platforms that disagree, keeps its own name.
+    A parent that already has the fuller name keeps it. Without a parent name the first platform's name is used."""
+    kids = [clean_name(k) for k in kid_names if k]
+    if not parent_name:
+        return kids[0] if kids else None
+    p = clean_name(parent_name)
+    ext = [k for k in kids if extends(k, p)]
+    if is_bare(p):
+        pool = ext or [k for k in kids if k != p and not is_bare(k)]
+        if not pool:
+            return p
+        counts = {}
+        for k in pool:
+            counts[k] = counts.get(k, 0) + 1
+        return min(counts, key=lambda k: (-counts[k], len(k), k))
+    if ext and len(ext) == len(kids) and len(set(kids)) == 1:
+        return kids[0]
+    return p
 
 
 def main(feed, out):
@@ -129,9 +182,9 @@ def main(feed, out):
     for key, i in used.items():
         rec = stops.get(key)
         kids = children.get(key, [])
-        name = (rec['stop_name'] if rec else None) or (kids[0]['stop_name'] if kids else key)
         pts = [rec] if rec and rec['stop_lat'] else [k for k in kids if k['stop_lat']]
-        st_name[i] = clean_name(name)
+        # a parent station's own row is among its children (it is its own key): the platforms are the others
+        st_name[i] = station_name(rec['stop_name'] if rec else None, [k['stop_name'] for k in kids if k is not rec]) or clean_name(key)
         st_lat[i] = sum(float(p['stop_lat']) for p in pts) / max(1, len(pts))
         st_lon[i] = sum(float(p['stop_lon']) for p in pts) / max(1, len(pts))
 
