@@ -35,7 +35,8 @@ upload_build_files() { # <dir> <bucket> <date>
 }
 
 # Sign the manifest when a KMS key is configured: put the key id into it, sign its canonical form (build/manifest.py),
-# let KMS verify the signature, put the signature in as r|s and verify that form again here with openssl. The data role may use this one key and nothing else.
+# let KMS verify the signature, put the signature in as r|s, and verify that form again here with openssl. The data
+# role may use this one key and nothing else.
 # No key configured: the manifest stays unsigned (an app that holds no public key does not look for a signature).
 sign_pointer() { # <latest.json>
   [ -n "${SIGNING_KEY_ARN:-}" ] || return 0
