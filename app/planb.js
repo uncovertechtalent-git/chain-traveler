@@ -76,9 +76,22 @@ export function plan(tt, { day, src, dst, t0, plannedArr = null, exclude = null,
   return { options, base, baseKind: plannedArr !== null ? 'plan' : 'best', src, dst, t0 };
 }
 
+// The network around the journey, for the graph: the stations reachable from src within maxMin minutes and the leg that
+// first reaches each (the earliest-arrival tree), with positions. Quiet background: it belongs to no way.
+export function contextOf(tt, { day, src, t0, exclude = null, minTransfer = 4, maxMin = 180 }) {
+  const edges = tt.reachEdges(tt.earliestArrival({ day, src, t0, minTransfer, exclude }), { maxMin });
+  const ids = new Set();
+  for (const e of edges) { ids.add(e.from); ids.add(e.to); }
+  return {
+    nodes: [...ids].map(st => ({ st, name: tt.names[st], lat: tt.lat[st], lon: tt.lon[st], deg: tt.degree[st] })),
+    edges: edges.map(e => ({ from: e.from, to: e.to })),
+  };
+}
+
 // The ways as a graph: stations as nodes, legs as edges. An edge takes the colour of the best way that uses it and the
 // most trains an hour of any way that uses it. ghost: the legs of the original plan still ahead, drawn for comparison.
-export function graphOf(tt, result, { ghost = null } = {}) {
+// context: contextOf(), carried along for the drawing.
+export function graphOf(tt, result, { ghost = null, context = null } = {}) {
   const nodes = new Map(), edges = new Map();
   const node = s => {
     if (!nodes.has(s)) nodes.set(s, { st: s, name: tt.names[s], lat: tt.lat[s], lon: tt.lon[s], arr: null, rank: 3, src: s === result.src, dst: s === result.dst });
@@ -106,5 +119,5 @@ export function graphOf(tt, result, { ghost = null } = {}) {
   for (const e of edges.values()) out.push(e);
   const dstNode = nodes.get(result.dst);
   if (dstNode) { const best = result.options.reduce((m, o) => (o.delta < m.delta ? o : m), result.options[0]); dstNode.delta = best.delta; dstNode.band = best.band; }
-  return { nodes: [...nodes.values()], edges: out, src: result.src, dst: result.dst, t0: result.t0, baseKind: result.baseKind };
+  return { nodes: [...nodes.values()], edges: out, src: result.src, dst: result.dst, t0: result.t0, baseKind: result.baseKind, context };
 }

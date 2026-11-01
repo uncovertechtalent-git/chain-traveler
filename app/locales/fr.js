@@ -123,6 +123,7 @@ export default {
   'legend.bad': 'au-delà.',
   'legend.thick': 'Épaisseur du trait : trains par heure sur ce tronçon, de un (fin) à quatre ou plus (épais).',
   'legend.dotted': 'Le trait pointillé : votre plan initial.',
+  'legend.context': 'Gris : les autres gares que vous pouvez atteindre d’ici.',
 
   // ---- Plan B: where you are
   'loc.looking': 'Recherche de votre position...',

@@ -1,7 +1,7 @@
 // The Plan B tab: "my train is out, where do I go from here". Reads its own inputs, asks app/planb.js for the ways on,
 // and draws them (app/graph.js) next to a list. The page helpers come from app.js through initLive().
 import { t, th, raw, dur, minutes, dist, errText } from './i18n.js';
-import { plan, graphOf, GOOD_MIN, LATE_MIN } from './planb.js';
+import { plan, graphOf, contextOf, GOOD_MIN, LATE_MIN } from './planb.js';
 import { svgOf } from './graph.js';
 
 export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSelect, minTransfer }) {
@@ -11,6 +11,8 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
   let ghost = null;        // the legs of the original plan still ahead, when we came from the chain view
   let dayIso = '';         // the chosen date, kept as a date because day numbers change with the timetable
   let drawnWidth = 0;      // the width the graph was last drawn at
+  let contextRun = 0;      // counts runs, so a network that arrives for a replaced run is dropped
+  let known = { tt: null, key: '', context: null };   // the last network around you, for a redraw with the same inputs
 
   const forget = () => { out = new Set(); ghost = null; };
   // A time of day, with +1 after midnight of the chosen date, so a train on the next day is not read as one today.
@@ -38,9 +40,10 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
     return `<li class="opt ${o.band}"><div class="head"><b class="t">${at(o.arr)}</b> ${th('opt.arrive')} <span class="chip ${o.band}">${esc(chipText(o, baseKind))}</span>${o.tags.map(g => ` <span class="tag">${th('tag.' + g)}</span>`).join('')}</div><div class="mute">${esc(meta.join(' · '))}</div>${legLines(tt, o)}</li>`;
   }
 
-  const legend = baseKind => `<p class="legend2"><span class="chip good">${th('legend.green')}</span> ${th('legend.good', { n: GOOD_MIN, base: t(baseKind === 'plan' ? 'legend.basePlan' : 'legend.baseBest') })} <span class="chip mid">${th('legend.amber')}</span> ${th('legend.mid', { n: LATE_MIN })} <span class="chip bad">${th('legend.red')}</span> ${th('legend.bad')} ${th('legend.thick')}${baseKind === 'plan' ? ` ${th('legend.dotted')}` : ''}</p>`;
+  const legend = (baseKind, withContext) => `<p class="legend2"><span class="chip good">${th('legend.green')}</span> ${th('legend.good', { n: GOOD_MIN, base: t(baseKind === 'plan' ? 'legend.basePlan' : 'legend.baseBest') })} <span class="chip mid">${th('legend.amber')}</span> ${th('legend.mid', { n: LATE_MIN })} <span class="chip bad">${th('legend.red')}</span> ${th('legend.bad')} ${th('legend.thick')}${baseKind === 'plan' ? ` ${th('legend.dotted')}` : ''}${withContext ? ` ${th('legend.context')}` : ''}</p>`;
 
   function run() {
+    contextRun++;    // whatever network was on its way belongs to the run before this one
     const tt = getTt();
     const src = pSrc.get(), dst = pDst.get();
     const deps = $('#ldeps'), res = $('#lres');
@@ -70,11 +73,26 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
     const lead = result.baseKind === 'plan'
       ? t('live.leadPlan', { plan: at(result.base), best: at(first.arr), later: first.delta > 0 ? t('live.later', { dur: dur(first.delta) }) : '' })
       : t('live.leadBest', { best: at(first.arr) });
-    const model = graphOf(tt, result, { ghost });
     // The graph is drawn at the width it is shown at, so its text keeps its size on a phone; the box is taller there.
     drawnWidth = Math.max(300, Math.min(720, res.clientWidth || 720));
-    const svg = svgOf(model, { width: drawnWidth, height: Math.round(drawnWidth * (drawnWidth < 500 ? 1.15 : 0.72)), label: t('graph.label', { from: tt.names[src], to: tt.names[dst] }), min: t('unit.min') });
-    res.innerHTML = `<p class="lead2">${esc(lead)}</p>${svg}${legend(result.baseKind)}<ol class="opts">${result.options.map(o => optionHtml(tt, o, result.baseKind)).join('')}</ol>`;
+    const paint = context => {
+      const model = graphOf(tt, result, { ghost, context });
+      const svg = svgOf(model, { width: drawnWidth, height: Math.round(drawnWidth * (drawnWidth < 500 ? 1.15 : 0.72)), label: t('graph.label', { from: tt.names[src], to: tt.names[dst] }), min: t('unit.min') });
+      res.innerHTML = `<p class="lead2">${esc(lead)}</p>${svg}${legend(result.baseKind, !!context && context.nodes.length > 0)}<ol class="opts">${result.options.map(o => optionHtml(tt, o, result.baseKind)).join('')}</ol>`;
+    };
+    // The network around you, as quiet background: where else you could get to, as far as the way on takes and a bit
+    // more. It needs a scan of its own, so the ways are drawn first and the network follows; a run that was replaced
+    // meanwhile (another tick, another language) is dropped, and the last network is kept for a redraw.
+    const ask = { day, src, t0, exclude: out, minTransfer: minTransfer(), maxMin: Math.min(300, Math.max(90, first.arr - t0 + 30)) };
+    const key = [ask.day, ask.src, ask.t0, ask.minTransfer, ask.maxMin, [...out].sort().join(',')].join('|');
+    const mine = contextRun;
+    if (known.tt === tt && known.key === key) { paint(known.context); return; }
+    paint(null);
+    setTimeout(() => {
+      if (mine !== contextRun) return;
+      known = { tt, key, context: contextOf(tt, ask) };
+      paint(known.context);
+    }, 20);
   }
 
   // "Use my location": one position reading from the device (no tracking, nothing stored, nothing sent), the nearest

@@ -189,6 +189,23 @@ export class Timetable {
     return { arr, inC, footFrom, tripBoard, src, day, t0 };
   }
 
+  // The edges of the earliest-arrival tree in `res`, for the network around a journey: each station reached within
+  // maxMin minutes of the start, with the station its last leg (or walk) started from, as { from, to, arr }.
+  reachEdges(res, { maxMin = 180 } = {}) {
+    const out = [];
+    for (let s = 0; s < this.nStations; s++) {
+      if (s === res.src || res.arr[s] >= INF || res.arr[s] - res.t0 > maxMin) continue;
+      let from = -1;
+      if (res.footFrom[s] >= 0) from = res.footFrom[s];
+      else if (res.inC[s] >= 0) {
+        const e = res.inC[s];
+        from = this.connFrom[decCi(res.tripBoard[decLayer(e) * this.nTrips + this.connTrip[decCi(e)]])];
+      }
+      if (from >= 0) out.push({ from, to: s, arr: res.arr[s] });
+    }
+    return out;
+  }
+
   legsTo(res, dst) {
     const legs = [];
     let s = dst, guard = 0;

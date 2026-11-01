@@ -123,6 +123,7 @@ export default {
   'legend.bad': 'daarboven.',
   'legend.thick': 'Lijndikte: treinen per uur op dat traject, van één (dun) tot vier of meer (dik).',
   'legend.dotted': 'De stippellijn: het plan dat je had.',
+  'legend.context': 'Grijs: de andere stations die je vanaf hier kunt bereiken.',
 
   // ---- Plan B: where you are
   'loc.looking': 'Je positie wordt bepaald...',

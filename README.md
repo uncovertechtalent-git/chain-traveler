@@ -80,6 +80,16 @@ timetable on the device, in tens of milliseconds.
    The browser asks for permission, and the site's Permissions-Policy has to allow it (`geolocation=(self)`, set in
    site-infra). Times after midnight of the chosen date carry "+1".
 
+## Plan B, the network around you
+
+Behind the ways the graph draws the rest of the network in grey: from where you are, the earliest-arrival tree of the
+timetable (the leg that first reaches each station, so every station you can get to within about the time the way on
+takes, plus half an hour, has one hairline to the station it is reached from), a dot at each station, and the names
+of up to four busy stations that are not near a station on a way. It is context, not advice: it says where else the
+trains from here go. It uses the same positions as the ways, only what falls inside the picture is drawn, and the ways
+stay on top. It costs one more scan of the timetable (about 80 ms on a laptop), so the ways are drawn first and the
+network follows a moment later; it is kept for a redraw with the same inputs.
+
 ## Languages
 
 English, Polski, Русский, Română, Български, Українська, Türkçe, Nederlands, Français and Español. The language is the
@@ -167,7 +177,7 @@ next step if the threat model ever needs it.
 
 | Suite | Runs | Covers |
 |---|---|---|
-| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search, the stations nearest to a position. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG. Deterministic, no network. The languages (`i18n.test.mjs`): same keys, placeholders and plural forms in every locale, no markup, and every key used. |
+| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search, the stations nearest to a position. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG; the network around a journey on a small star network (`context.test.mjs`): the earliest-arrival tree, walks, the time cut, runs marked out, and how the SVG draws it. Deterministic, no network. The languages (`i18n.test.mjs`): same keys, placeholders and plural forms in every locale, no markup, and every key used. |
 | `test/build/` | on every pull request (Python `unittest`) | The manifest and its checks (changed byte, truncated or missing file, malformed fields), retention of three builds, and `scripts/ci/deploy-shell.sh` and `publish-data.sh` against a fake AWS CLI: the shell deploy never writes under `data/`, the publish never writes outside it, the pointer is written last, a same-day build with other bytes is refused, a damaged upload leaves the old pointer. |
 | `test/feed/` | before a timetable build is published, and locally after `scripts/fetch-feed.sh` | The engine on the real national timetable: size and age of the window, named chains (Wolfsburg to Leipzig and München, München to Wolfsburg via Nürnberg, Wolfsburg to München via Leipzig), the Leipzig footpath, a train past midnight, station search, and Plan B with the planned first train out (ordered ways, none of them the cancelled run, well under a second). Days come from the data, bounds are generous ceilings. |
 
