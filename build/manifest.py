@@ -7,7 +7,11 @@ download before use:
 
   {"format": 1, "date": "2026-10-31", "sha256": "<timetable.bin.gz>", "bytes": 5231112,
    "metaSha256": "<meta.json>", "metaBytes": 269000, "firstDate": "2026-10-31", "nDays": 31,
-   "built": "2026-10-31T16:46:18Z", "feedSha256": "<the gtfs.de zip>"}
+   "built": "2026-10-31T16:46:18Z", "feedSha256": "<the gtfs.de zip>",
+   "tripIdsSha256": "<trip-ids.txt.gz>", "tripIdsBytes": 584817}
+
+trip-ids.txt.gz is optional (a build made before it existed has none) and the app never reads it: it is the feed's
+trip id of every trip number, which build/realtime.py needs to put the live delays on the trips of this build.
 
 Usage:
   manifest.py make <built-dir> <out-dir> [--date YYYY-MM-DD]   write <out-dir>/data/<date>/ and <out-dir>/data/latest.json
@@ -23,6 +27,7 @@ import sys
 
 FORMAT = 1
 BUILD_FILES = ('timetable.bin.gz', 'meta.json')
+TRIP_IDS_FILE = 'trip-ids.txt.gz'       # optional sidecar of a build, bound to the manifest when present
 DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 SHA_RE = re.compile(r'^[0-9a-f]{64}$')
 MAGIC = b'CHT1'
@@ -49,7 +54,7 @@ def make_manifest(build_dir, date=None):
     feed_sha = meta['feed'].get('sha256')
     if not feed_sha or not SHA_RE.match(feed_sha):
         raise ValueError('meta.json carries no feed sha256; run the build with the feed zip beside the feed directory')
-    return {
+    m = {
         'format': FORMAT,
         'date': date,
         'sha256': sha256_file(bin_path),
@@ -61,6 +66,11 @@ def make_manifest(build_dir, date=None):
         'built': built,
         'feedSha256': feed_sha,
     }
+    ids_path = os.path.join(build_dir, TRIP_IDS_FILE)
+    if os.path.isfile(ids_path):
+        m['tripIdsSha256'] = sha256_file(ids_path)
+        m['tripIdsBytes'] = os.path.getsize(ids_path)
+    return m
 
 
 def validate_manifest(m):
@@ -78,12 +88,22 @@ def validate_manifest(m):
             raise ValueError('%s must be a positive integer' % k)
     if not isinstance(m.get('built'), str):
         raise ValueError('built must be a timestamp string')
+    if ('tripIdsSha256' in m) != ('tripIdsBytes' in m):
+        raise ValueError('tripIdsSha256 and tripIdsBytes come together')
+    if 'tripIdsSha256' in m:
+        if not isinstance(m['tripIdsSha256'], str) or not SHA_RE.match(m['tripIdsSha256']):
+            raise ValueError('tripIdsSha256 must be a lowercase hex sha256')
+        if not isinstance(m['tripIdsBytes'], int) or isinstance(m['tripIdsBytes'], bool) or m['tripIdsBytes'] <= 0:
+            raise ValueError('tripIdsBytes must be a positive integer')
 
 
 def check_build(build_dir, manifest):
     """Raise ValueError unless the files in build_dir match the manifest byte for byte."""
     validate_manifest(manifest)
-    for name, sha_key, size_key in (('timetable.bin.gz', 'sha256', 'bytes'), ('meta.json', 'metaSha256', 'metaBytes')):
+    files = [('timetable.bin.gz', 'sha256', 'bytes'), ('meta.json', 'metaSha256', 'metaBytes')]
+    if 'tripIdsSha256' in manifest:
+        files.append((TRIP_IDS_FILE, 'tripIdsSha256', 'tripIdsBytes'))
+    for name, sha_key, size_key in files:
         path = os.path.join(build_dir, name)
         if not os.path.isfile(path):
             raise ValueError('%s is missing' % name)
@@ -122,7 +142,7 @@ def cmd_make(args):
     m = make_manifest(build_dir, date)
     target = os.path.join(out_dir, 'data', m['date'])
     os.makedirs(target, exist_ok=True)
-    for name in BUILD_FILES:
+    for name in BUILD_FILES + ((TRIP_IDS_FILE,) if 'tripIdsSha256' in m else ()):
         shutil.copyfile(os.path.join(build_dir, name), os.path.join(target, name))
     check_build(target, m)
     write_json(os.path.join(out_dir, 'data', 'latest.json'), m)

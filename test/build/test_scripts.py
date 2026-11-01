@@ -60,9 +60,9 @@ class ScriptTest(unittest.TestCase):
         with open(os.path.join(self.s3, BUCKET, key), 'rb') as f:
             return f.read()
 
-    def make_dist(self, name, built, feed_sha, payload=b'CHT1' + b'\0' * 28):
+    def make_dist(self, name, built, feed_sha, payload=b'CHT1' + b'\0' * 28, trip_ids=None):
         build = os.path.join(self.tmp, name + '-build')
-        write_build(build, payload=payload, built=built, feed_sha=feed_sha)
+        write_build(build, payload=payload, built=built, feed_sha=feed_sha, trip_ids=trip_ids)
         out = os.path.join(self.tmp, name + '-dist')
         r = subprocess.run([sys.executable, '-I', os.path.join(ROOT, 'build', 'manifest.py'), 'make', build, out], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -154,6 +154,29 @@ class ScriptTest(unittest.TestCase):
         self.assertEqual(self.meta('data/latest.json')['cache-control'], 'no-cache')
         self.assertEqual(self.pointer()['date'], '2026-10-31')
 
+    def test_publish_uploads_the_trip_id_file_with_the_build_and_the_pointer_names_it(self):
+        dist = self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32, trip_ids=b'1099100\t365\n')
+        r = self.publish(dist, FAKE_ALLOW_PREFIX='data/')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.keys(), ['data/2026-10-31/meta.json', 'data/2026-10-31/timetable.bin.gz', 'data/2026-10-31/trip-ids.txt.gz', 'data/latest.json'])
+        self.assertEqual(self.meta('data/2026-10-31/trip-ids.txt.gz')['cache-control'], 'public, max-age=31536000, immutable')
+        puts = [c['key'] for c in self.calls() if c['op'] == 'put']
+        self.assertEqual(puts[-1], 'data/latest.json', 'the pointer is still written last')
+        self.assertEqual(self.pointer()['tripIdsBytes'], len(self.read('data/2026-10-31/trip-ids.txt.gz')))
+
+    def test_publish_without_a_trip_id_file_writes_none(self):
+        r = self.publish(self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32), FAKE_ALLOW_PREFIX='data/')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.keys(), ['data/2026-10-31/meta.json', 'data/2026-10-31/timetable.bin.gz', 'data/latest.json'])
+        self.assertNotIn('tripIdsSha256', self.pointer())
+
+    def test_publish_does_not_move_the_pointer_when_the_trip_id_file_cannot_be_written(self):
+        first = self.make_dist('a', '2026-10-30T09:50:00Z', 'a1' * 32, trip_ids=b'1\t2\n')
+        self.assertEqual(self.publish(first).returncode, 0)
+        r = self.publish(self.make_dist('b', '2026-10-31T09:50:00Z', 'b2' * 32, trip_ids=b'3\t4\n'), FAKE_DENY_PREFIX='data/2026-10-31/trip-ids')
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(self.pointer()['date'], '2026-10-30', 'the app keeps the old build')
+
     def test_publish_skips_a_feed_that_is_already_published(self):
         self.assertEqual(self.publish(self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32)).returncode, 0)
         before = len(self.calls())
@@ -196,6 +219,21 @@ class ScriptTest(unittest.TestCase):
         self.assertEqual(self.pointer()['date'], '2026-10-30')
         self.assertEqual(self.pointer()['feedSha256'], 'a1' * 32)
         self.assertIn('data/2026-10-31/timetable.bin.gz', self.keys(), 'rollback deletes nothing')
+
+    def test_rollback_keeps_the_trip_id_file_of_the_kept_build(self):
+        self.assertEqual(self.publish(self.make_dist('a', '2026-10-30T09:50:00Z', 'a1' * 32, trip_ids=b'1\t2\n')).returncode, 0)
+        self.assertEqual(self.publish(self.make_dist('b', '2026-10-31T09:50:00Z', 'b2' * 32, trip_ids=b'3\t4\n')).returncode, 0)
+        r = self.run_script(os.path.join(ROOT, 'scripts', 'ci', 'publish-data.sh'), 'rollback', '2026-10-30', BUCKET, FAKE_ALLOW_PREFIX='data/')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.pointer()['tripIdsBytes'], len(self.read('data/2026-10-30/trip-ids.txt.gz')))
+
+    def test_rollback_to_a_build_made_before_the_trip_id_file_points_at_a_manifest_without_it(self):
+        self.assertEqual(self.publish(self.make_dist('a', '2026-10-30T09:50:00Z', 'a1' * 32)).returncode, 0)
+        self.assertEqual(self.publish(self.make_dist('b', '2026-10-31T09:50:00Z', 'b2' * 32, trip_ids=b'3\t4\n')).returncode, 0)
+        r = self.run_script(os.path.join(ROOT, 'scripts', 'ci', 'publish-data.sh'), 'rollback', '2026-10-30', BUCKET, FAKE_ALLOW_PREFIX='data/')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.pointer()['date'], '2026-10-30')
+        self.assertNotIn('tripIdsSha256', self.pointer())
 
     def test_rollback_to_a_build_that_is_gone_fails_and_changes_nothing(self):
         self.assertEqual(self.publish(self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32)).returncode, 0)

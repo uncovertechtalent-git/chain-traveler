@@ -7,8 +7,9 @@
 # publish, in this order, stopping at the first failure:
 #   1. skip when the feed behind the current latest.json is the feed of this build (nothing new);
 #   2. refuse to overwrite data/<date>/ when it exists with other bytes (builds are immutable);
-#   3. upload the build under data/<date>/ with a one-year immutable Cache-Control;
-#   4. read it back and verify both files against the manifest;
+#   3. upload the build under data/<date>/ with a one-year immutable Cache-Control (timetable.bin.gz, meta.json and,
+#      when the build has it, trip-ids.txt.gz, the sidecar that build/realtime.py reads);
+#   4. read it back and verify every file against the manifest;
 #   5. only then write data/latest.json (not cached at the edge), which is what makes the build current;
 #   6. delete all but the newest KEEP builds (default 3), never the one just published.
 # The role behind this script may only touch data/* in the bucket (site-infra).
@@ -29,6 +30,10 @@ upload_build_files() { # <dir> <bucket> <date>
     --content-type "application/octet-stream" --cache-control "public, max-age=31536000, immutable"
   aws s3 cp "$1/meta.json" "s3://$2/data/$3/meta.json" --only-show-errors \
     --content-type "application/json; charset=utf-8" --cache-control "public, max-age=31536000, immutable"
+  if [ -f "$1/trip-ids.txt.gz" ]; then
+    aws s3 cp "$1/trip-ids.txt.gz" "s3://$2/data/$3/trip-ids.txt.gz" --only-show-errors \
+      --content-type "application/octet-stream" --cache-control "public, max-age=31536000, immutable"
+  fi
 }
 
 write_pointer() { # <latest.json> <bucket>
@@ -36,10 +41,11 @@ write_pointer() { # <latest.json> <bucket>
     --content-type "application/json; charset=utf-8" --cache-control "no-cache"
 }
 
-fetch_build() { # <bucket> <date> <dir>: returns 1 when the build is not there
+fetch_build() { # <bucket> <date> <dir>: returns 1 when the build is not there; trip-ids.txt.gz is fetched when it exists
   mkdir -p "$3"
   aws s3 cp "s3://$1/data/$2/timetable.bin.gz" "$3/timetable.bin.gz" --only-show-errors 2>/dev/null || return 1
   aws s3 cp "s3://$1/data/$2/meta.json" "$3/meta.json" --only-show-errors 2>/dev/null || return 1
+  aws s3 cp "s3://$1/data/$2/trip-ids.txt.gz" "$3/trip-ids.txt.gz" --only-show-errors 2>/dev/null || rm -f "$3/trip-ids.txt.gz"
 }
 
 prune_old() { # <bucket> <current date>

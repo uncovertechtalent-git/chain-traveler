@@ -16,10 +16,13 @@ import manifest  # noqa: E402
 FEED_SHA = 'ab' * 32
 
 
-def write_build(d, payload=b'CHT1' + b'\0' * 28, built='2026-10-31T16:46:18Z', feed_sha=FEED_SHA):
+def write_build(d, payload=b'CHT1' + b'\0' * 28, built='2026-10-31T16:46:18Z', feed_sha=FEED_SHA, trip_ids=None):
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, 'timetable.bin.gz'), 'wb') as f:
         f.write(gzip.compress(payload, 9, mtime=0))
+    if trip_ids is not None:
+        with open(os.path.join(d, 'trip-ids.txt.gz'), 'wb') as f:
+            f.write(gzip.compress(trip_ids, 9, mtime=0))
     meta = {'format': 1, 'firstDate': '2026-10-31', 'nDays': 31, 'feed': {'built': built, 'sha256': feed_sha}}
     with open(os.path.join(d, 'meta.json'), 'w', encoding='utf-8') as f:
         json.dump(meta, f)
@@ -95,6 +98,53 @@ class ManifestTest(unittest.TestCase):
                 manifest.validate_manifest(m)
         with self.assertRaises(ValueError):
             manifest.validate_manifest([])
+
+    def test_a_build_without_trip_ids_has_a_manifest_without_them(self):
+        m = manifest.make_manifest(self.build)
+        self.assertNotIn('tripIdsSha256', m)
+        manifest.validate_manifest(m)
+
+    def test_the_trip_id_file_is_bound_to_the_manifest_when_the_build_has_one(self):
+        write_build(self.build, trip_ids=b'1099100\t365\n')
+        m = manifest.make_manifest(self.build)
+        with open(os.path.join(self.build, 'trip-ids.txt.gz'), 'rb') as f:
+            raw = f.read()
+        self.assertEqual((m['tripIdsSha256'], m['tripIdsBytes']), (hashlib.sha256(raw).hexdigest(), len(raw)))
+        manifest.check_build(self.build, m)
+
+    def test_check_refuses_a_changed_trip_id_file_and_a_missing_one(self):
+        write_build(self.build, trip_ids=b'1099100\t365\n')
+        m = manifest.make_manifest(self.build)
+        path = os.path.join(self.build, 'trip-ids.txt.gz')
+        with open(path, 'rb') as f:
+            data = bytearray(f.read())
+        data[-5] ^= 1
+        with open(path, 'wb') as f:
+            f.write(data)
+        with self.assertRaisesRegex(ValueError, 'trip-ids'):
+            manifest.check_build(self.build, m)
+        os.remove(path)
+        with self.assertRaisesRegex(ValueError, 'missing'):
+            manifest.check_build(self.build, m)
+
+    def test_validate_refuses_a_half_given_or_malformed_trip_id_entry(self):
+        write_build(self.build, trip_ids=b'1\t2\n')
+        good = manifest.make_manifest(self.build)
+        for bad in ({'tripIdsSha256': None}, {'tripIdsBytes': 0}, {'tripIdsBytes': True}, {'tripIdsSha256': 'XYZ'}):
+            with self.assertRaises(ValueError, msg=str(bad)):
+                manifest.validate_manifest(dict(good, **bad))
+        for key in ('tripIdsSha256', 'tripIdsBytes'):
+            m = dict(good)
+            del m[key]
+            with self.assertRaises(ValueError, msg='only ' + key):
+                manifest.validate_manifest(m)
+
+    def test_make_copies_the_trip_id_file_next_to_the_build(self):
+        write_build(self.build, trip_ids=b'1099100\t365\n')
+        out = os.path.join(self.tmp, 'out')
+        r = subprocess.run([sys.executable, '-I', os.path.join(ROOT, 'build', 'manifest.py'), 'make', self.build, out], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(sorted(os.listdir(os.path.join(out, 'data', '2026-10-31'))), ['meta.json', 'timetable.bin.gz', 'trip-ids.txt.gz'])
 
     def test_prune_keeps_the_newest_three(self):
         dates = ['2026-10-29', '2026-10-31', '2026-10-30', '2026-11-01', '2026-10-28']

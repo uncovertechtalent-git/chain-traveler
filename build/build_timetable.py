@@ -4,6 +4,8 @@
 Input : an unpacked gtfs.de "Schienenregionalverkehr Deutschland" feed (DELFI NeTEx converted to GTFS).
 Output: <out>/meta.json          station names and positions, line labels, feed provenance
         <out>/timetable.bin.gz   connection arrays, trip arrays, and footpaths, little-endian
+        <out>/trip-ids.txt.gz    one line per trip number: the feed's trip_id, a tab, the minute its first stop is left
+                                 (not read by the app: build/realtime.py matches the live stream to trip numbers with it)
 
 Every consecutive stop pair of every trip becomes one connection (from, to, dep, arr, trip, flags).
 Times are whole minutes after midnight of the service day and may exceed 1440. A trip carries a
@@ -42,6 +44,17 @@ def minutes(s):
 
 def align4(n):
     return (n + 3) & ~3
+
+
+def trip_ids_file(ids, starts):
+    """Line n is trip number n: the feed's trip_id, a tab, the minute after midnight its first stop is left (empty when
+    the feed gives no time there). Same bytes for the same feed."""
+    lines = []
+    for tid, m in zip(ids, starts):
+        if '\t' in tid or '\n' in tid or '\r' in tid:
+            raise SystemExit('trip_id with a tab or a line break: %r' % tid)
+        lines.append('%s\t%s\n' % (tid, '' if m is None else m))
+    return gzip.compress(''.join(lines).encode('utf-8'), 9, mtime=0)
 
 
 def clean_name(name):
@@ -139,6 +152,7 @@ def main(feed, out):
     line_idx, lines = {}, []
     trip_idx = {}
     trip_svc, trip_line, trip_term = array.array('I'), array.array('H'), array.array('H')
+    trip_feed_id, trip_start = [], []
     conns = []
     for tid, rows in by_trip.items():
         rows.sort(key=lambda x: x[0])
@@ -152,6 +166,8 @@ def main(feed, out):
         trip_svc.append(m)
         trip_line.append(line_idx[label])
         trip_term.append(used[rows[-1][3]])
+        trip_feed_id.append(tid)
+        trip_start.append(rows[0][2] if rows[0][2] is not None else rows[0][1])
         for a, b in zip(rows, rows[1:]):
             if a[3] is None or b[3] is None or a[3] == b[3]:
                 continue
@@ -206,6 +222,8 @@ def main(feed, out):
     packed = gzip.compress(bytes(blob), 9, mtime=0)  # mtime 0: the same feed gives the same bytes
     with open(os.path.join(out, 'timetable.bin.gz'), 'wb') as f:
         f.write(packed)
+    with open(os.path.join(out, 'trip-ids.txt.gz'), 'wb') as f:
+        f.write(trip_ids_file(trip_feed_id, trip_start))
 
     zip_sha = None
     zpath = os.path.join(os.path.dirname(os.path.abspath(feed)), 'latest.zip')
@@ -231,7 +249,8 @@ def main(feed, out):
     with open(os.path.join(out, 'meta.json'), 'w', encoding='utf-8') as f:
         json.dump(meta, f, ensure_ascii=False, separators=(',', ':'))
     print('stations %d  connections %d  trips %d  footpaths %d  days %d from %s' % (len(used), n_conn, len(trip_svc), n_foot, n_days, first))
-    print('timetable.bin.gz %.1f MB  meta.json %.2f MB' % (len(packed) / 1e6, os.path.getsize(os.path.join(out, 'meta.json')) / 1e6))
+    mb = lambda name: os.path.getsize(os.path.join(out, name)) / 1e6
+    print('timetable.bin.gz %.1f MB  meta.json %.2f MB  trip-ids.txt.gz %.2f MB' % (len(packed) / 1e6, mb('meta.json'), mb('trip-ids.txt.gz')))
 
 
 if __name__ == '__main__':
