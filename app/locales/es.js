@@ -123,6 +123,7 @@ export default {
   'legend.bad': 'más allá.',
   'legend.thick': 'Grosor de la línea: trenes por hora en ese tramo, de uno (fina) a cuatro o más (gruesa).',
   'legend.dotted': 'La línea de puntos: el plan que tenías.',
+  'legend.context': 'Gris: las demás estaciones a las que puedes llegar desde aquí.',
 
   // ---- Plan B: where you are
   'loc.looking': 'Buscando tu ubicación...',
