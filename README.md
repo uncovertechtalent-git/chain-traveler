@@ -6,6 +6,12 @@ device, so it plans offline in tens of milliseconds. No account, no tracking, no
 
 Licence: MIT. Timetable data: gtfs.de, data provided by DELFI e.V., CC BY 4.0 (see "Data and attribution").
 
+Think of it as GPS for the Deutschlandticket: where you are, where you are going, the trains the ticket allows, and a
+new route when one of them does not come. It is also a worked example of two things, told as short stories in
+[docs/graphs-by-parable.md](docs/graphs-by-parable.md) (how a timetable is a graph, and what "recalculating" means on one)
+and [docs/infrastructure-as-amplifier.md](docs/infrastructure-as-amplifier.md) (what a small pipeline amplifies, with the
+failures of the first day left in).
+
 ## What it does
 
 | Screen | What you get |
