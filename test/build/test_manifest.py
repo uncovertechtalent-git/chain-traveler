@@ -16,11 +16,13 @@ import manifest  # noqa: E402
 FEED_SHA = 'ab' * 32
 
 
-def write_build(d, payload=b'CHT1' + b'\0' * 28, built='2026-10-31T16:46:18Z', feed_sha=FEED_SHA):
+def write_build(d, payload=b'CHT1' + b'\0' * 28, built='2026-10-31T16:46:18Z', feed_sha=FEED_SHA, stations=None):
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, 'timetable.bin.gz'), 'wb') as f:
         f.write(gzip.compress(payload, 9, mtime=0))
     meta = {'format': 1, 'firstDate': '2026-10-31', 'nDays': 31, 'feed': {'built': built, 'sha256': feed_sha}}
+    if stations is not None:
+        meta['stations'] = stations
     with open(os.path.join(d, 'meta.json'), 'w', encoding='utf-8') as f:
         json.dump(meta, f)
 

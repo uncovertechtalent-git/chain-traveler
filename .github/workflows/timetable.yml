@@ -12,10 +12,11 @@ name: Timetable
 #
 # `publish` is skipped until the repository variable S3_DEPLOY is "on"; `build` then still runs as a dry run
 # and keeps its artifact for seven days. A manual run can instead point latest.json back at a kept build
-# (input rollback_to), which is the data rollback.
+# (input rollback_to), which is the data rollback. A manual run can also publish a build of a feed that is already
+# published (input republish), for a change in how the timetable is built from the same feed; see publish-data.sh.
 #
 # The feed is regenerated around 09:40 UTC; the schedule leaves margin. The run is idempotent: when the feed
-# behind the current latest.json is the feed of this build, publish does nothing.
+# behind the current latest.json is the feed of this build, publish does nothing (unless a manual run asks to republish).
 # Secrets (repository): AWS_DATA_ROLE_ARN, SITE_BUCKET, and SIGNING_KEY_ARN once the manifest signing key exists (site-infra);
 # without it the manifest is published unsigned, as before.
 
@@ -29,6 +30,11 @@ on:
         required: false
         default: ""
         type: string
+      republish:
+        description: "Publish this build even though its feed is the one behind the current latest.json (a change in how the timetable is built, such as the station names). The build is dated by its feed: data/<feed date>/ must be free or hold this build."
+        required: false
+        default: false
+        type: boolean
 
 permissions: {}
 
@@ -122,6 +128,7 @@ jobs:
           AWS_ROLE_ARN: ${{ secrets.AWS_DATA_ROLE_ARN }}
           SITE_BUCKET: ${{ secrets.SITE_BUCKET }}
           SIGNING_KEY_ARN: ${{ secrets.SIGNING_KEY_ARN }}
+          REPUBLISH: ${{ inputs.republish && '1' || '' }}
           AWS_REGION: eu-central-1
         run: |
           . scripts/ci/aws-session.sh

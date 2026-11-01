@@ -60,9 +60,9 @@ class ScriptTest(unittest.TestCase):
         with open(os.path.join(self.s3, BUCKET, key), 'rb') as f:
             return f.read()
 
-    def make_dist(self, name, built, feed_sha, payload=b'CHT1' + b'\0' * 28):
+    def make_dist(self, name, built, feed_sha, payload=b'CHT1' + b'\0' * 28, stations=None):
         build = os.path.join(self.tmp, name + '-build')
-        write_build(build, payload=payload, built=built, feed_sha=feed_sha)
+        write_build(build, payload=payload, built=built, feed_sha=feed_sha, stations=stations)
         out = os.path.join(self.tmp, name + '-dist')
         r = subprocess.run([sys.executable, '-I', os.path.join(ROOT, 'build', 'manifest.py'), 'make', build, out], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -163,6 +163,117 @@ class ScriptTest(unittest.TestCase):
         self.assertEqual([c for c in self.calls()[before:] if c['op'] in ('put', 'delete')], [])
         self.assertEqual(self.pointer()['date'], '2026-10-31')
 
+    def summary_of(self, run):
+        """Run a publish step with a job summary file and return what it wrote."""
+        path = os.path.join(self.tmp, 'summary.md')
+        if os.path.exists(path):
+            os.remove(path)
+        r = run(GITHUB_STEP_SUMMARY=path)
+        text = ''
+        if os.path.exists(path):
+            with open(path, encoding='utf-8') as f:
+                text = f.read()
+        return r, text
+
+    def put_keys(self):
+        return [c['key'] for c in self.calls() if c['op'] == 'put']
+
+    def test_publish_republishes_a_published_feed_only_when_asked(self):
+        self.assertEqual(self.publish(self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32)).returncode, 0)
+        again = self.make_dist('b', '2026-11-01T11:20:00Z', 'a1' * 32)   # the same feed, built the next day
+        for env in ({}, {'REPUBLISH': ''}):
+            before = len(self.put_keys())
+            r = self.publish(again, **env)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn('has not changed', r.stdout, env)
+            self.assertEqual(self.pointer()['date'], '2026-10-31', env)
+            self.assertEqual(len(self.put_keys()), before, 'nothing is written without the input: ' + str(env))
+        r = self.publish(again, REPUBLISH='1')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('anyway', r.stdout)
+        self.assertEqual(self.pointer()['date'], '2026-11-01', 'the pointer moves to the build of the feed date')
+        self.assertIn('data/2026-11-01/meta.json', self.keys())
+        self.assertEqual(self.put_keys()[-1], 'data/latest.json', 'the pointer is still written last')
+
+    def test_a_republish_under_the_feed_date_writes_that_path_and_moves_the_pointer(self):
+        # the case of the station names: the feed is published as 2026-11-01 (built the day after the feed), and the same
+        # feed built again is dated by its feed, a path that is still free
+        self.assertEqual(self.publish(self.make_dist('a', '2026-11-01T09:13:30Z', 'a1' * 32, stations=['Hbf'])).returncode, 0)
+        again = self.make_dist('b', '2026-10-31T09:38:32Z', 'a1' * 32, stations=['Stuttgart Hbf'])
+        r = self.publish(again, REPUBLISH='1')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.pointer()['date'], '2026-10-31')
+        self.assertEqual(json.loads(self.read('data/2026-10-31/meta.json'))['stations'], ['Stuttgart Hbf'])
+        self.assertEqual(json.loads(self.read('data/2026-11-01/meta.json'))['stations'], ['Hbf'], 'the published build is untouched')
+
+    def test_a_taken_date_with_another_meta_json_is_refused_whatever_the_input(self):
+        # a rename-only rebuild: the same timetable.bin.gz bytes, another meta.json. Its dated meta.json is served as
+        # immutable for a year, so nothing already published may change, republish or not.
+        for name, env, feed in (('input', {'REPUBLISH': '1'}, 'a1' * 32), ('other feed', {}, 'b2' * 32)):
+            with self.subTest(name):
+                self.setUp()
+                self.assertEqual(self.publish(self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32, stations=['Hbf', 'Feuersee'])).returncode, 0)
+                meta, bin_, pointer, puts = (self.read('data/2026-10-31/meta.json'), self.read('data/2026-10-31/timetable.bin.gz'),
+                                             self.read('data/latest.json'), len(self.put_keys()))
+                renamed = self.make_dist('b', '2026-10-31T09:50:00Z', feed, stations=['Stuttgart Hbf', 'Stuttgart Feuersee'])
+                r, summary = self.summary_of(lambda **e: self.publish(renamed, **dict(env, **e)))
+                self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+                self.assertIn('immutable', r.stderr)
+                self.assertIn('meta.json', r.stderr, 'the file that differs is named')
+                self.assertIn('next feed', r.stderr)
+                self.assertEqual(self.read('data/2026-10-31/meta.json'), meta)
+                self.assertEqual(self.read('data/2026-10-31/timetable.bin.gz'), bin_)
+                self.assertEqual(self.read('data/latest.json'), pointer, 'the old pointer stays')
+                self.assertEqual(len(self.put_keys()), puts, 'nothing was written')
+                self.assertIn('Refused', summary)
+
+    def test_a_rebuild_with_another_build_time_is_another_build_too(self):
+        # both files are compared as they are, the time the build was made in meta.json included: a fresh run that finds
+        # an unfinished publish of the same feed under its date waits for the next feed. A re-run of the failed job
+        # starts from the same artifact and gets through (the next test).
+        self.assertEqual(self.publish(self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32, stations=['Hbf'])).returncode, 0)
+        os.remove(os.path.join(self.s3, BUCKET, 'data', 'latest.json'))
+        r = self.publish(self.make_dist('b', '2026-10-31T13:00:00Z', 'a1' * 32, stations=['Hbf']))
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertNotIn('data/latest.json', self.keys())
+
+    def test_a_taken_date_with_the_same_files_uploads_nothing_and_the_pointer_may_move(self):
+        dist = self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32, stations=['Hbf'])
+        self.assertEqual(self.publish(dist).returncode, 0)
+        os.remove(os.path.join(self.s3, BUCKET, 'data', 'latest.json'))     # the run stopped before the pointer
+        before = len(self.put_keys())
+        r, summary = self.summary_of(lambda **e: self.publish(dist, **e))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('nothing to upload', r.stdout)
+        self.assertEqual(self.put_keys()[before:], ['data/latest.json'], 'only the pointer is written')
+        self.assertEqual(self.pointer()['date'], '2026-10-31')
+        self.assertIn('nothing was uploaded', summary)
+
+    def test_a_republish_of_the_build_that_is_already_there_writes_only_the_pointer(self):
+        dist = self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32, stations=['Hbf'])
+        self.assertEqual(self.publish(dist).returncode, 0)
+        before = len(self.put_keys())
+        r = self.publish(dist, REPUBLISH='1')
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.put_keys()[before:], ['data/latest.json'])
+        self.assertEqual(self.pointer()['date'], '2026-10-31')
+
+    def test_the_job_summary_says_which_path_was_taken(self):
+        first = self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32, stations=['Hbf'])
+        r, s = self.summary_of(lambda **e: self.publish(first, **e))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertRegex(s, r'(?m)^### Timetable publish\n\n- Published build `2026-10-31` \(')
+        self.assertNotIn('Republished', s)
+        later = self.make_dist('b', '2026-11-01T11:20:00Z', 'a1' * 32, stations=['Hbf'])
+        r, s = self.summary_of(lambda **e: self.publish(later, **e))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertRegex(s, r'(?m)^Skipped: the gtfs\.de feed \(sha256 `a1a1a1a1a1a1`\) is the one behind the current build\.$')
+        r, s = self.summary_of(lambda **e: self.publish(later, REPUBLISH='1', **e))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertRegex(s, r'(?m)^- Republished build `2026-11-01` \(')
+        self.assertIn('- On request (republish): the gtfs.de feed (sha256 `a1a1a1a1a1a1`)', s)
+        self.assertNotIn('Skipped', s)
+
     def test_publish_keeps_the_newest_three_builds(self):
         for i, day in enumerate(['2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31']):
             r = self.publish(self.make_dist(day, day + 'T09:50:00Z', '%02x' % (i + 1) * 32), FAKE_ALLOW_PREFIX='data/')
@@ -178,6 +289,7 @@ class ScriptTest(unittest.TestCase):
         r = self.publish(other)
         self.assertEqual(r.returncode, 1)
         self.assertIn('immutable', r.stderr)
+        self.assertIn('timetable.bin.gz', r.stderr, 'the file that differs is named')
         self.assertEqual(self.read('data/2026-10-31/timetable.bin.gz'), before)
         self.assertEqual(self.pointer()['feedSha256'], 'a1' * 32)
 
