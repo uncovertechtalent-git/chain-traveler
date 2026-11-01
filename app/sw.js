@@ -13,6 +13,11 @@ const VERSION = '__SHELL_VERSION__';
 const SHELL_CACHE = 'ct-shell-' + VERSION;
 const SHELL = ['./', 'index.html', 'app.js', 'engine.js', 'data-store.js', 'style.css', 'manifest.webmanifest', 'icon.svg'];
 const DATED_BUILD = /\/data\/\d{4}-\d{2}-\d{2}\//;
+// Lookups in our own caches ignore Vary. The CDN answers every file with "Vary: Origin", and Chrome adds an Origin
+// header to module-script requests, so a file stored at install (a plain request) would not match its own module
+// request, and the first launch offline after an install or an update would not start. One release per cache, keyed
+// by URL: there is no variant to tell apart.
+const IGNORE_VARY = { ignoreVary: true };
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -37,7 +42,7 @@ self.addEventListener('fetch', e => {
   if (url.origin !== self.location.origin) return;
 
   if (DATED_BUILD.test(url.pathname)) {
-    e.respondWith(caches.match(req).then(hit => hit || fetch(req)));
+    e.respondWith(caches.match(req, IGNORE_VARY).then(hit => hit || fetch(req)));
     return;
   }
   if (url.pathname.includes('/data/')) return;   // latest.json and anything else under data/: straight to the network
@@ -48,6 +53,6 @@ self.addEventListener('fetch', e => {
         if (res.ok && res.type === 'basic') { const copy = res.clone(); caches.open(SHELL_CACHE).then(c => c.put(req, copy)); }
         return res;
       })
-      .catch(() => caches.match(req, { ignoreSearch: true }).then(hit => hit || (req.mode === 'navigate' ? caches.match('index.html') : Response.error()))),
+      .catch(() => caches.match(req, { ignoreSearch: true, ...IGNORE_VARY }).then(hit => hit || (req.mode === 'navigate' ? caches.match('index.html', IGNORE_VARY) : Response.error()))),
   );
 });
