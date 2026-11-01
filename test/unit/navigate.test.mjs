@@ -224,3 +224,11 @@ test('the map copes with no ways at all: the route and you', () => {
   assert.ok(svg.includes('class="e act"') && svg.includes('class="me"'));
   assert.ok(!svg.includes('class="e good"') && !svg.includes('class="e bad"'));
 });
+
+test('where: the minute a train arrives you are at its station, waiting for the next; the minute one leaves you are on it', () => {
+  const arrived = where(legs, legs[0].arr);
+  assert.deepEqual([arrived.phase, arrived.i, arrived.leg.line, arrived.inMin], ['waiting', 1, 'RE30', hm('07:35') - hm('07:28')]);
+  const leaving = where(legs, legs[1].dep);
+  assert.deepEqual([leaving.phase, leaving.i, leaving.leg.line], ['riding', 1, 'RE30']);
+  assert.equal(where(legs, legs[1].dep - 1).phase, 'waiting', 'a minute before it leaves you are still waiting');
+});
