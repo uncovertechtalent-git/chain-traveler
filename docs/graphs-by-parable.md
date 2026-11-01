@@ -74,9 +74,11 @@ because many earliest arrivals in the region run through Magdeburg.
 ## What a graph does not know
 
 The clerk has the timetable, not the day. If a train is twenty minutes late the paper does not say so, and if a train is
-cancelled she only knows because you told her. Car GPS has the same problem and solves it with live traffic. For trains
-the equivalent is a live feed of delays (GTFS-Realtime), which exists for part of Germany and is a separate service with a
-separate licence. Until it is added, every "late" in the app means "later than planned, if every train runs as planned".
+cancelled she only knows because you told her. Car GPS solves the same problem with live traffic. Chain Traveler leaves it
+out on purpose: it is a Plan B tool, not a second bahn.de. The paper gives the ways on, and the person standing in the
+station reads the departure board and picks one of them. Every "late" in the app means "later than planned, if every train
+runs as planned". (A live feed of delays exists for part of Germany, GTFS-Realtime; it was built as an experiment and
+dropped as more detail than the tool needs.)
 
 Two more limits. The timetable says what the operators **published**: at the time of writing the feed has no
 Saturday trains and almost no Sunday trains at Wolfsburg Hbf, and the app shows what the file says. And the Deutschlandticket
@@ -92,7 +94,7 @@ motorway is still a GPS; it is a GPS for the roads you may use.
 | The route | The chain: the earliest arrival, with changes and stop-overs |
 | "Recalculating" | Plan B: cross out the failed train, scan again from here, now |
 | The other roads at a junction | The grey network: the shortest-path tree from where you stand |
-| Live traffic | Delays (GTFS-Realtime): partial, and not yet in the routing |
+| Live traffic | Left out on purpose: you read the departure board at the station and choose among the ways on your phone |
 
 ## Where to read the code
 
