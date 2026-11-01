@@ -2,6 +2,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Langue',
+  'theme.toggle': 'Mode clair ou sombre',
   'meta.sub': 'Plan B pour le Deutschlandticket : quand votre train régional est supprimé, voyez toutes les options pour continuer depuis l’endroit où vous êtes. Ou enchaînez des trains entre deux gares allemandes. Heures prévues, lues hors ligne dans les horaires enregistrés sur cet appareil.',
   'status.loading': 'Chargement des horaires...',
   'status.first': 'Premier chargement des horaires (environ 5 Mo)...',

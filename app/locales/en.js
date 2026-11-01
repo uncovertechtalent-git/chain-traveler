@@ -20,6 +20,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Language',
+  'theme.toggle': 'Light or dark mode',
   'meta.sub': 'Plan B for the Deutschlandticket: when your regional train is out, see every way on from where you are. Or chain trains between any two German stations. Planned times, read offline from the timetable on this device.',
   'status.loading': 'Loading the timetable...',
   'status.first': 'Loading the timetable for the first time (about 5 MB)...',

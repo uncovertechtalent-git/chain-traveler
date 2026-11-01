@@ -2,6 +2,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Idioma',
+  'theme.toggle': 'Modo claro u oscuro',
   'meta.sub': 'Plan B para el Deutschlandticket: cuando tu tren regional se cancela, mira todas las alternativas para seguir desde donde estás. O encadena trenes entre dos estaciones alemanas cualesquiera. Horas previstas, leídas sin conexión de los horarios guardados en este dispositivo.',
   'status.loading': 'Cargando los horarios...',
   'status.first': 'Cargando los horarios por primera vez (unos 5 MB)...',

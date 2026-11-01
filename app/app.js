@@ -5,6 +5,7 @@ import { MANIFEST_KEYS } from './keys.js';
 import { initLive } from './live.js';
 import { initNavigate } from './navigate.js';
 import { berlinClock, tick as clockStep, atLaunch, onReturn, migrate } from './here.js';
+import { initTheme } from './theme.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -466,6 +467,7 @@ async function start() {
   const status = $('#status');
   state = loadState();
   buildLangSelect();
+  initTheme($('#theme'));
   onLang(refreshLanguage);
   await setLang(initialLang(), { save: false });
   status.textContent = t('status.loading');

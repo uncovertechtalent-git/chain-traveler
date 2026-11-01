@@ -2,6 +2,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Język',
+  'theme.toggle': 'Tryb jasny lub ciemny',
   'meta.sub': 'Plan B na Deutschlandticket: gdy pociąg regionalny jest odwołany, zobacz wszystkie opcje dalszej jazdy stąd, gdzie jesteś. Albo ułóż łańcuch pociągów między dowolnymi stacjami w Niemczech. Godziny planowe, odczytywane offline z rozkładu na tym urządzeniu.',
   'status.loading': 'Wczytywanie rozkładu...',
   'status.first': 'Pierwsze wczytywanie rozkładu (ok. 5 MB)...',

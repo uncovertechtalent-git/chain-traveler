@@ -24,6 +24,10 @@ because an "I am at" from yesterday is wrong. A station that was picked stays. T
 are in the Chain tab; the minimum change is under the bar. `app/here.js` holds the rules (the clock of Germany, what a tick
 changes, what becomes of a position from the last visit) as plain functions with tests.
 
+A sun or moon button beside the language box switches between the light and the dark theme. With nothing chosen the page follows
+the device; a choice is kept in this browser and applied before the first paint (`app/theme-boot.js`, a plain script in the
+head, because a module is deferred; `app/theme.js` holds the button and the rules).
+
 | Screen | What you get |
 |---|---|
 | Chain | Earliest chain of trains from a start to a target station after a time, on a chosen date. Optional stop-over with a minimum stay: it arrives at the stop-over as early as possible, waits out the stay, then chains onward as early as possible. Walks between nearby stations, tight changes flagged, and the next trains at every stop so you can swap the plan on the day. |

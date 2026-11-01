@@ -3,6 +3,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Limbă',
+  'theme.toggle': 'Mod luminos sau întunecat',
   'meta.sub': 'Planul B pentru Deutschlandticket: când trenul regional este anulat, vedeți toate variantele de continuare de acolo unde vă aflați. Sau legați în lanț trenuri între oricare două gări germane. Ore planificate, citite offline din orarul de pe acest dispozitiv.',
   'status.loading': 'Se încarcă orarul...',
   'status.first': 'Se încarcă orarul pentru prima dată (aproximativ 5 MB)...',

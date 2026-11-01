@@ -4,6 +4,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Dil',
+  'theme.toggle': 'Açık veya koyu mod',
   'meta.sub': 'Deutschlandticket için Plan B: bölgesel treniniz iptal olduğunda bulunduğunuz yerden devam etme seçeneklerinin hepsini görün. Ya da herhangi iki Alman istasyonu arasında trenleri zincirleyin. Planlanan saatler, bu cihazdaki sefer saatlerinden çevrimdışı okunur.',
   'status.loading': 'Sefer saatleri yükleniyor...',
   'status.first': 'Sefer saatleri ilk kez yükleniyor (yaklaşık 5 MB)...',

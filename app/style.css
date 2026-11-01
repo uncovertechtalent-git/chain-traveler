@@ -170,3 +170,13 @@ table.deps th{overflow-wrap:normal}
 table.deps .dt{width:4rem}
 table.deps .dl{width:4.6rem}
 @media (max-width:480px){table.deps td,table.deps th{padding:5px 3px;font-size:.85rem}table.deps .dt{width:3.7rem}table.deps .dl{width:3.9rem}table.deps .line{margin:0}}
+/* the light/dark switch: the native controls follow the theme, and the button shows the theme it would switch to */
+:root{color-scheme:light dark}
+:root[data-theme="light"]{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
+.topctl{display:flex;align-items:center;gap:8px}
+.themebtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;min-height:36px;padding:0;flex:0 0 auto}
+.themebtn .sun{display:none}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .themebtn .sun{display:block}:root:not([data-theme="light"]) .themebtn .moon{display:none}}
+:root[data-theme="dark"] .themebtn .sun{display:block}
+:root[data-theme="dark"] .themebtn .moon{display:none}

@@ -2,6 +2,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Taal',
+  'theme.toggle': 'Lichte of donkere modus',
   'meta.sub': 'Plan B voor het Deutschlandticket: valt je regionale trein uit, bekijk dan alle opties om vanaf waar je bent verder te komen. Of schakel treinen tussen twee Duitse stations aan elkaar. Geplande tijden, offline gelezen uit de dienstregeling op dit apparaat.',
   'status.loading': 'Dienstregeling laden...',
   'status.first': 'Dienstregeling voor het eerst laden (ca. 5 MB)...',
