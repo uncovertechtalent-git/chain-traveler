@@ -3,6 +3,7 @@
 They prove what the scripts do and, with the allow and deny prefixes, that they stay inside the permissions of
 their roles: the shell deploy never writes under data/, the data publish never writes outside it.
 """
+import hashlib
 import json
 import os
 import shutil
@@ -227,15 +228,55 @@ class ScriptTest(unittest.TestCase):
                 self.assertEqual(len(self.put_keys()), puts, 'nothing was written')
                 self.assertIn('Refused', summary)
 
-    def test_a_rebuild_with_another_build_time_is_another_build_too(self):
-        # both files are compared as they are, the time the build was made in meta.json included: a fresh run that finds
-        # an unfinished publish of the same feed under its date waits for the next feed. A re-run of the failed job
-        # starts from the same artifact and gets through (the next test).
+    def test_a_rebuild_of_the_same_timetable_at_another_time_keeps_the_published_files(self):
+        # meta.json carries the wall-clock time of the build (feed.built): a rebuild of the same feed with the same code
+        # never repeats it and is still the same build. The published files stay (they are served as immutable for a
+        # year) and the pointer is made from them, so it describes them, their time included.
+        self.assertEqual(self.publish(self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32, stations=['Hbf'])).returncode, 0)
+        meta, bin_, pointer = self.read('data/2026-10-31/meta.json'), self.read('data/2026-10-31/timetable.bin.gz'), self.pointer()
+        before = len(self.put_keys())
+        again = self.make_dist('b', '2026-10-31T13:00:00Z', 'a1' * 32, stations=['Hbf'])
+        r, summary = self.summary_of(lambda **e: self.publish(again, REPUBLISH='1', **e))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('only the time it was built differs', r.stdout)
+        self.assertEqual(self.put_keys()[before:], ['data/latest.json'], 'only the pointer is written')
+        self.assertEqual(self.read('data/2026-10-31/meta.json'), meta)
+        self.assertEqual(self.read('data/2026-10-31/timetable.bin.gz'), bin_)
+        self.assertEqual(self.pointer(), pointer, 'the pointer describes the published files, not the rebuild')
+        self.assertEqual(self.pointer()['built'], '2026-10-31T09:50:00Z')
+        self.assertEqual(self.pointer()['metaSha256'], hashlib.sha256(meta).hexdigest())
+        self.assertIn('already held this build, made at another time: nothing was uploaded', summary)
+
+    def test_a_fresh_run_that_finds_an_unfinished_publish_of_the_same_feed_finishes_it(self):
+        # the run stopped before the pointer; the next run of the same feed builds again (another build time) and gets through
         self.assertEqual(self.publish(self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32, stations=['Hbf'])).returncode, 0)
         os.remove(os.path.join(self.s3, BUCKET, 'data', 'latest.json'))
+        before = len(self.put_keys())
         r = self.publish(self.make_dist('b', '2026-10-31T13:00:00Z', 'a1' * 32, stations=['Hbf']))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.put_keys()[before:], ['data/latest.json'])
+        self.assertEqual(self.pointer()['built'], '2026-10-31T09:50:00Z')
+
+    def test_the_same_meta_json_over_another_timetable_is_another_build(self):
+        # only the time may differ: a changed timetable.bin.gz under a taken date is refused, whatever the input
+        self.assertEqual(self.publish(self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32, stations=['Hbf'])).returncode, 0)
+        bin_, pointer, puts = self.read('data/2026-10-31/timetable.bin.gz'), self.read('data/latest.json'), len(self.put_keys())
+        other = self.make_dist('b', '2026-10-31T13:00:00Z', 'a1' * 32, payload=b'CHT1' + b'\1' * 28, stations=['Hbf'])
+        r = self.publish(other, REPUBLISH='1')
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
-        self.assertNotIn('data/latest.json', self.keys())
+        self.assertIn('timetable.bin.gz', r.stderr, 'the file that differs is named')
+        self.assertEqual(self.read('data/2026-10-31/timetable.bin.gz'), bin_)
+        self.assertEqual(self.read('data/latest.json'), pointer)
+        self.assertEqual(len(self.put_keys()), puts, 'nothing was written')
+
+    def test_another_feed_under_a_taken_date_is_another_build_even_with_the_same_timetable_bytes(self):
+        self.assertEqual(self.publish(self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32, stations=['Hbf'])).returncode, 0)
+        pointer, puts = self.read('data/latest.json'), len(self.put_keys())
+        r = self.publish(self.make_dist('b', '2026-10-31T13:00:00Z', 'b2' * 32, stations=['Hbf']))
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn('meta.json', r.stderr)
+        self.assertEqual(self.read('data/latest.json'), pointer)
+        self.assertEqual(len(self.put_keys()), puts)
 
     def test_a_taken_date_with_the_same_files_uploads_nothing_and_the_pointer_may_move(self):
         dist = self.make_dist('a', '2026-10-31T09:50:00Z', 'a1' * 32, stations=['Hbf'])

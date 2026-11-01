@@ -89,6 +89,55 @@ class ManifestTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'missing'):
             manifest.check_build(self.build, m)
 
+    def second_build(self, name='other', **kw):
+        other = os.path.join(self.tmp, name)
+        shutil.rmtree(other, ignore_errors=True)
+        write_build(other, **kw)
+        return other
+
+    def test_same_build_ignores_only_the_time_the_build_was_made(self):
+        manifest.same_build(self.build, self.second_build())
+        manifest.same_build(self.build, self.second_build(built='2026-11-01T13:00:00Z'))
+
+    def test_same_build_names_a_changed_timetable_and_a_changed_meta_json(self):
+        with self.assertRaisesRegex(ValueError, 'timetable.bin.gz: differs'):
+            manifest.same_build(self.build, self.second_build(payload=b'CHT1' + b'\1' * 28))
+        for kw in ({'feed_sha': 'cd' * 32}, {'stations': ['Stuttgart Hbf']}):
+            with self.assertRaisesRegex(ValueError, 'meta.json: differs from the published file in more than feed.built', msg=str(kw)):
+                manifest.same_build(self.build, self.second_build(**kw))
+
+    def test_same_build_refuses_a_missing_or_broken_file(self):
+        other = self.second_build()
+        os.remove(os.path.join(other, 'meta.json'))
+        with self.assertRaisesRegex(ValueError, 'meta.json is missing'):
+            manifest.same_build(self.build, other)
+        other = self.second_build()
+        with open(os.path.join(other, 'meta.json'), 'w') as f:
+            f.write('{')
+        with self.assertRaises(ValueError):
+            manifest.same_build(self.build, other)
+
+    def test_same_build_does_not_look_at_anything_else_than_the_feed_time(self):
+        # feed.built is the one field left out; the same name elsewhere is data like any other
+        a, b = self.second_build('a', stations=['x']), self.second_build('b', stations=['x'])
+        for d, built in ((a, 'one'), (b, 'two')):
+            path = os.path.join(d, 'meta.json')
+            with open(path, encoding='utf-8') as f:
+                m = json.load(f)
+            m['built'] = built
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(m, f)
+        with self.assertRaisesRegex(ValueError, 'meta.json'):
+            manifest.same_build(a, b)
+
+    def test_the_same_command_says_ok_or_names_the_file(self):
+        script = os.path.join(os.path.dirname(os.path.abspath(manifest.__file__)), 'manifest.py')
+        r = subprocess.run([sys.executable, '-I', script, 'same', self.build, self.second_build(built='2026-11-01T13:00:00Z')], capture_output=True, text=True)
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, 'ok'), r.stderr)
+        r = subprocess.run([sys.executable, '-I', script, 'same', self.build, self.second_build(stations=['y'])], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('meta.json', r.stderr)
+
     def test_validate_refuses_malformed_manifests(self):
         good = manifest.make_manifest(self.build)
         for key, bad in (('format', 2), ('sha256', 'XYZ'), ('date', '31.10.2026'), ('bytes', 0), ('bytes', True), ('nDays', -1), ('built', 5)):

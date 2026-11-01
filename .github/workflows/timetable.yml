@@ -31,7 +31,7 @@ on:
         default: ""
         type: string
       republish:
-        description: "Publish this build even though its feed is the one behind the current latest.json (a change in how the timetable is built, such as the station names). The build is dated by its feed: data/<feed date>/ must be free or hold this build."
+        description: "Publish this build even though its feed is the one behind the current latest.json (a change in how the timetable is built, such as the station names). The build is dated by its feed: data/<feed date>/ must be free or hold the same timetable (it may differ in the time it was built)."
         required: false
         default: false
         type: boolean
