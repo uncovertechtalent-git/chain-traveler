@@ -141,6 +141,7 @@ export default {
   'legend.bad': 'beyond that.',
   'legend.thick': 'Line thickness: trains an hour on that leg, from one (thin) to four or more (thick).',
   'legend.dotted': 'The dotted line: the plan you had.',
+  'legend.context': 'Grey: the other stations you can reach from here.',
 
   // ---- Plan B: where you are
   'loc.looking': 'Looking for your position...',

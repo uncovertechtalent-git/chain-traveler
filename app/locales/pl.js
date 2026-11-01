@@ -133,6 +133,7 @@ export default {
   'legend.bad': 'jeszcze później.',
   'legend.thick': 'Grubość linii: liczba pociągów na godzinę na odcinku, od jednego (cienka) do czterech lub więcej (gruba).',
   'legend.dotted': 'Linia kropkowana: dotychczasowy plan.',
+  'legend.context': 'Szare: inne stacje, do których stąd dojedziesz.',
 
   // ---- Plan B: where you are
   'loc.looking': 'Ustalanie pozycji...',

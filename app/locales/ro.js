@@ -132,6 +132,7 @@ export default {
   'legend.bad': 'mai mult de atât.',
   'legend.thick': 'Grosimea liniei: trenuri pe oră pe tronsonul respectiv, de la unul (subțire) la patru sau mai multe (groasă).',
   'legend.dotted': 'Linia punctată: planul pe care îl aveați.',
+  'legend.context': 'Gri: celelalte gări la care se poate ajunge de aici.',
 
   // ---- Plan B: where you are
   'loc.looking': 'Se caută poziția dvs...',

@@ -125,6 +125,7 @@ export default {
   'legend.bad': 'bundan fazla.',
   'legend.thick': 'Çizgi kalınlığı: o bölümde saatte kaç tren olduğunu gösterir; bir (ince) ile dört veya daha fazla (kalın) arasında değişir.',
   'legend.dotted': 'Noktalı çizgi: sahip olduğunuz plan.',
+  'legend.context': 'Gri: buradan ulaşabileceğiniz diğer istasyonlar.',
 
   // ---- Plan B: where you are
   'loc.looking': 'Konumunuz aranıyor...',
