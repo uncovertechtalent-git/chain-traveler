@@ -5,9 +5,15 @@
 #   rollback <date> <bucket>      point data/latest.json at the kept build <date>, after verifying its files
 #
 # publish, in this order, stopping at the first failure:
-#   1. skip when the feed behind the current latest.json is the feed of this build (nothing new);
-#   2. refuse to overwrite data/<date>/ when it exists with other bytes (builds are immutable);
-#   3. upload the build under data/<date>/ with a one-year immutable Cache-Control;
+#   1. skip when the feed behind the current latest.json is the feed of this build (nothing new), unless REPUBLISH is
+#      set: a manual run of the workflow with the input republish, for a change in how the timetable is built from the
+#      same feed (the names of the stations, say), which the daily run would skip;
+#   2. refuse to overwrite data/<date>/ when it exists with other files, REPUBLISH or not: nothing already published
+#      ever changes, and a dated meta.json is served as immutable for a year. Both files are compared with the
+#      manifest (sha256 and metaSha256). When both are identical there is nothing to upload and the pointer may still
+#      move to the build. The build is dated by its feed (plain YYYY-MM-DD, which the app and its service worker match),
+#      so a build of a feed with other content under a taken date has to wait for the next feed;
+#   3. upload the build under data/<date>/ with a one-year immutable Cache-Control (not when it is already there);
 #   4. read it back and verify both files against the manifest;
 #   5. only then write data/latest.json (not cached at the edge), which is what makes the build current. When
 #      SIGNING_KEY_ARN is set, the manifest is signed first (sign_pointer): it gets the key id and an ECDSA P-256
@@ -24,7 +30,7 @@ manifest="$here/../../build/manifest.py"
 keep="${KEEP:-3}"
 mode="${1:-}"
 
-summary() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '%s\n' "$*" >> "$GITHUB_STEP_SUMMARY"; return 0; }
+summary() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '%s\n' "$@" >> "$GITHUB_STEP_SUMMARY"; return 0; }   # one line per argument
 json_field() { python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))[sys.argv[2]])' "$1" "$2"; }
 
 upload_build_files() { # <dir> <bucket> <date>
@@ -91,7 +97,7 @@ prune_old() { # <bucket> <current date>
 }
 
 publish() {
-  local dist="${1:?dist dir}" bucket="${2:?bucket}" tmp date feed remote_feed
+  local dist="${1:?dist dir}" bucket="${2:?bucket}" tmp date feed remote_feed how="Published" held=""
   tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' RETURN
   date="$(json_field "$dist/data/latest.json" date)"
   feed="$(json_field "$dist/data/latest.json" feedSha256)"
@@ -100,28 +106,41 @@ publish() {
   if aws s3 cp "s3://$bucket/data/latest.json" "$tmp/remote-latest.json" --only-show-errors 2>/dev/null; then
     remote_feed="$(json_field "$tmp/remote-latest.json" feedSha256 || true)"
     if [ "$remote_feed" = "$feed" ]; then
-      echo "the feed has not changed since the published build; nothing to do"
-      summary "### Timetable publish" ""
-      summary "Skipped: the gtfs.de feed (sha256 \`${feed:0:12}\`) is the one behind the current build."
-      return 0
+      if [ -z "${REPUBLISH:-}" ]; then
+        echo "the feed has not changed since the published build; nothing to do"
+        summary "### Timetable publish" ""
+        summary "Skipped: the gtfs.de feed (sha256 \`${feed:0:12}\`) is the one behind the current build."
+        return 0
+      fi
+      echo "the feed is the one behind the published build; publishing this build of it anyway (REPUBLISH is set)"
+      how="Republished"
     fi
   fi
 
   if fetch_build "$bucket" "$date" "$tmp/existing"; then
-    if ! cmp -s "$tmp/existing/timetable.bin.gz" "$dist/data/$date/timetable.bin.gz"; then
-      echo "::error::data/$date/ exists with different bytes; builds are immutable. Run again tomorrow, or remove that build by hand first." >&2
+    # the files already there against the manifest of this build: the error on stderr names the file that differs
+    if ! python3 -I "$manifest" check "$tmp/existing" "$dist/data/latest.json" > /dev/null; then
+      echo "::error::data/$date/ already holds another build; nothing already published ever changes (meta.json is served as immutable for a year), so this build waits for the next feed, which is dated differently" >&2
+      summary "### Timetable publish" "" "- Refused: \`data/$date/\` already holds another build (the file that differs is named in the log). Nothing was written; the build goes out with the next feed."
       return 1
     fi
-    echo "data/$date/ already holds this build; completing the publish"
+    echo "data/$date/ already holds exactly this build: nothing to upload"
+    held=1
   fi
 
-  upload_build_files "$dist/data/$date" "$bucket" "$date"
+  [ -n "$held" ] || upload_build_files "$dist/data/$date" "$bucket" "$date"
   fetch_build "$bucket" "$date" "$tmp/readback" || { echo "::error::read-back of data/$date/ failed" >&2; return 1; }
   python3 -I "$manifest" check "$tmp/readback" "$dist/data/latest.json" >/dev/null
   sign_pointer "$dist/data/latest.json"
   write_pointer "$dist/data/latest.json" "$bucket"
   echo "published build $date"
-  summary "### Timetable publish" "" "- Published build \`$date\` ($(json_field "$dist/data/latest.json" bytes) bytes, sha256 \`$(json_field "$dist/data/latest.json" sha256 | cut -c1-12)\`)"
+  summary "### Timetable publish" "" "- $how build \`$date\` ($(json_field "$dist/data/latest.json" bytes) bytes, sha256 \`$(json_field "$dist/data/latest.json" sha256 | cut -c1-12)\`)"
+  if [ "$how" = "Republished" ]; then
+    summary "- On request (republish): the gtfs.de feed (sha256 \`${feed:0:12}\`) is the one behind the previous build."
+  fi
+  if [ -n "$held" ]; then
+    summary "- \`data/$date/\` already held exactly this build: nothing was uploaded; the pointer moved to it."
+  fi
   prune_old "$bucket" "$date"
 }
 
