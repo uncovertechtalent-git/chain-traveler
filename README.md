@@ -40,6 +40,7 @@ timetable, and it opens offline. On a phone, use "Add to Home Screen".
   stations, a rolling window of 31 days from the day the feed was generated.
 - Planned times only. No delays, cancellations or engineering works. International trains are not in it.
 - The Deutschlandticket covers these trains and no ICE or IC; long-distance trains are not in the feed.
+- Map behind the graphs: [Natural Earth](https://www.naturalearthdata.com/), public domain; see "The map behind the graphs".
 
 ## How it works
 
@@ -118,6 +119,40 @@ find the nearest station and is never stored or sent. A "Test the clock" box let
 What it does not know: delays and cancellations (the timetable has planned times only), so "missed" comes from you or from your
 position. A phone that sleeps stops the app's clock; it catches up the moment the page is visible again. Tracking uses the
 device's positioning, which uses battery; stop it when you do not need it.
+
+## The map behind the graphs
+
+The Plan B graph and the Navigate graph are drawn over a map of Germany and its neighbours: land, the German states, the
+larger rivers, lakes and the names of the biggest cities, in quiet colours for the light and the dark theme. "Show map"
+under a graph switches it; it is one choice for both graphs, kept in this browser, and on by default. The map is a file
+of the app (`app/basemap-data.js`, about 75 KB, 30 KB compressed, precached with the rest of the shell), not tiles: it
+works offline, and there is no tile provider, no key and no request. It is a backdrop to see where you are, not a street
+map: the lines are simplified to about a kilometre. The stations and the map go through one projection, so a station lies
+where it is on the map.
+
+**Source and licence.** [Natural Earth](https://www.naturalearthdata.com/) is in the public domain. The 10 m files used:
+countries, the German states, river centre lines, lakes and populated places (cities of 150,000 or more, with their German
+names). `build/basemap.py` (standard library only) turns the five GeoJSON files into `app/basemap-data.js`: lines simplified
+with Douglas-Peucker at 0.01 degrees, kept only if they reach the box around Germany, written as integers (the first point,
+then differences). The header of the output names the sha256 of every input. The output is committed, so a build never needs
+the network for it. To change the map:
+
+```
+mkdir ne && cd ne
+for f in admin_0_countries admin_1_states_provinces rivers_lake_centerlines lakes populated_places; do
+  curl -fsSLO https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_$f.geojson
+done
+cd .. && python3 -I build/basemap.py ne app/basemap-data.js
+```
+
+**Zoom and pan.** Drag the graph to move it. Zoom with the + and - buttons, a double click, a pinch, or Ctrl or Cmd with the
+wheel (a plain wheel keeps scrolling the page). With the graph focused, the arrow keys move it, + and - zoom and 0 fits.
+"Fit" shows the whole journey again. It is not animated: the picture is drawn again at the new view (`app/zoomview.js` holds
+the gestures and their maths, `app/graph.js` draws), only the lines that reach the picture are drawn and points less than a
+pixel apart are left out, so a draw takes a few milliseconds. The zoom goes from half to 8 times; at the deepest zoom the
+lines show their kilometre. In Navigate the view stays while the clock and your position update; a new chain starts at fit.
+At fit a finger on a phone still scrolls the page; once the graph is zoomed, a finger moves the map, and "Fit" gives the
+swipe back to the page.
 
 ## Languages
 
@@ -206,8 +241,8 @@ next step if the threat model ever needs it.
 
 | Suite | Runs | Covers |
 |---|---|---|
-| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search, the stations nearest to a position. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Navigate on the corridor timetable (`navigate.test.mjs`): where you are in a chain at each minute, missed by word or by position, not at the station, recalculation with the missed run kept out, and what is stored between launches. Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG; the network around a journey on a small star network (`context.test.mjs`): the earliest-arrival tree, walks, the time cut, runs marked out, and how the SVG draws it. Deterministic, no network. The languages (`i18n.test.mjs`): same keys, placeholders and plural forms in every locale, no markup, and every key used. |
-| `test/build/` | on every pull request (Python `unittest`) | The manifest and its checks (changed byte, truncated or missing file, malformed fields), retention of three builds, and `scripts/ci/deploy-shell.sh` and `publish-data.sh` against a fake AWS CLI: the shell deploy never writes under `data/`, the publish never writes outside it, the pointer is written last, a same-day build with other bytes is refused, a damaged upload leaves the old pointer. |
+| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search, the stations nearest to a position. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Navigate on the corridor timetable (`navigate.test.mjs`): where you are in a chain at each minute, missed by word or by position, not at the station, recalculation with the missed run kept out, and what is stored between launches. Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG; the network around a journey on a small star network (`context.test.mjs`): the earliest-arrival tree, walks, the time cut, runs marked out, and how the SVG draws it. The map and the zoom (`basemap.test.mjs`, `zoomview.test.mjs`): the map is drawn through the projection of the stations, only where the picture is, kept while the projection stays, switched off cleanly; the maths of pan, zoom and pinch (the point under the pointer stays, the limits hold). Deterministic, no network. The languages (`i18n.test.mjs`): same keys, placeholders and plural forms in every locale, no markup, and every key used. |
+| `test/build/` | on every pull request (Python `unittest`) | The manifest and its checks (changed byte, truncated or missing file, malformed fields), retention of three builds, and `scripts/ci/deploy-shell.sh` and `publish-data.sh` against a fake AWS CLI: the shell deploy never writes under `data/`, the publish never writes outside it, the pointer is written last, a same-day build with other bytes is refused, a damaged upload leaves the old pointer. The map builder (`test_basemap.py`): simplification keeps shape and ends (closed rings too), encoding round-trips, the layers and the cities of a synthetic Natural Earth, and the committed map (size, extent, header). |
 | `test/feed/` | before a timetable build is published, and locally after `scripts/fetch-feed.sh` | The engine on the real national timetable: size and age of the window, named chains (Wolfsburg to Leipzig and München, München to Wolfsburg via Nürnberg, Wolfsburg to München via Leipzig), the Leipzig footpath, a train past midnight, station search, and Plan B with the planned first train out (ordered ways, none of them the cancelled run, well under a second). Days come from the data, bounds are generous ceilings. |
 
 ## Known limits and next steps

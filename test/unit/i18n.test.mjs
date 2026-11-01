@@ -76,7 +76,7 @@ for (const code of codes) {
 }
 
 // Every key the code asks for is in English, and every English key is used somewhere.
-const sources = ['app.js', 'live.js', 'navigate.js', 'graph.js', 'planb.js', 'engine.js', 'data-store.js', 'i18n.js', 'notfound.js', 'index.html', '404.html']
+const sources = ['app.js', 'live.js', 'navigate.js', 'graph.js', 'zoomview.js', 'planb.js', 'engine.js', 'data-store.js', 'i18n.js', 'notfound.js', 'index.html', '404.html']
   .filter(f => fs.existsSync(path.join(appDir, f))).map(f => [f, fs.readFileSync(path.join(appDir, f), 'utf8')]);
 const asked = new Map();   // keys passed straight to t() / th() or written as data-i18n
 const used = new Set();    // any string in the code that is a key of English (keys picked by a ternary, built by parts)

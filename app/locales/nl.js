@@ -181,6 +181,7 @@ export default {
 
   // ---- footer
   'foot': 'Dienstregeling: {publisher}, {license}. {stations} stations, {connections} verbindingen, {first} tot {last}. Alleen geplande tijden, geen vertragingen of werkzaamheden. Controleer je reis in DB Navigator voordat je vertrekt.',
+  'foot.map': 'Kaart: Natural Earth (publiek domein).',
 
   // ---- units. {n} is a number
   'unit.h': 'u',
@@ -188,6 +189,13 @@ export default {
   'unit.m': '{n} m',
   'unit.km': '{n} km',
   'unit.perHour': '{n}/u',
+
+  // ---- the map behind the graphs
+  'map.show': 'Toon kaart',
+  'map.zoomIn': 'Inzoomen',
+  'map.zoomOut': 'Uitzoomen',
+  'map.fit': 'Passend',
+  'map.hint': 'Sleep om te verplaatsen. Zoom met knijpen of Ctrl/⌘ + scrollwiel.',
 
   // ---- the page for an address that does not exist
   'nf.title': 'Niet gevonden',

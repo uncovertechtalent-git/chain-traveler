@@ -191,6 +191,7 @@ export default {
 
   // ---- footer
   'foot': 'Розклад: {publisher}, {license}. Станцій: {stations}, сполучень: {connections}, період {first} – {last}. Лише плановий час, без затримок і ремонтних робіт. Перед поїздкою перевірте маршрут у DB Navigator.',
+  'foot.map': 'Карта: Natural Earth (суспільне надбання).',
 
   // ---- units. {n} is a number
   'unit.h': 'год',
@@ -198,6 +199,13 @@ export default {
   'unit.m': '{n} м',
   'unit.km': '{n} км',
   'unit.perHour': '{n}/год',
+
+  // ---- the map behind the graphs
+  'map.show': 'Показати карту',
+  'map.zoomIn': 'Наблизити',
+  'map.zoomOut': 'Віддалити',
+  'map.fit': 'Вмістити',
+  'map.hint': 'Перетягніть, щоб зсунути. Масштаб: щипок або Ctrl/⌘ + колесо.',
 
   // ---- the page for an address that does not exist
   'nf.title': 'Не знайдено',

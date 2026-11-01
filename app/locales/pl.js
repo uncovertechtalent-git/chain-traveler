@@ -191,6 +191,7 @@ export default {
 
   // ---- footer
   'foot': 'Rozkład: {publisher}, {license}. Stacji: {stations}, połączeń: {connections}, {first} – {last}. Tylko godziny planowe, bez opóźnień i prac torowych. Przed podróżą sprawdź trasę w DB Navigator.',
+  'foot.map': 'Mapa: Natural Earth (domena publiczna).',
 
   // ---- units. {n} is a number
   'unit.h': 'godz.',
@@ -198,6 +199,13 @@ export default {
   'unit.m': '{n} m',
   'unit.km': '{n} km',
   'unit.perHour': '{n}/godz.',
+
+  // ---- the map behind the graphs
+  'map.show': 'Pokaż mapę',
+  'map.zoomIn': 'Przybliż',
+  'map.zoomOut': 'Oddal',
+  'map.fit': 'Dopasuj',
+  'map.hint': 'Przeciągnij, aby przesunąć. Powiększanie: ściśnięcie palców lub Ctrl/⌘ + kółko.',
 
   // ---- the page for an address that does not exist
   'nf.title': 'Nie znaleziono',

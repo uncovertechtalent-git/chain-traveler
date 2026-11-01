@@ -232,7 +232,7 @@ function showAge(note, params = {}) {
 function renderFoot() {
   if (!tt) return;
   const f = tt.meta.feed;
-  $('#foot').textContent = t('foot', { publisher: f.publisher, license: f.license, stations: num(tt.nStations), connections: num(tt.nConn), first: tt.dateOf(0), last: tt.dateOf(tt.nDays - 1) });
+  $('#foot').textContent = t('foot', { publisher: f.publisher, license: f.license, stations: num(tt.nStations), connections: num(tt.nConn), first: tt.dateOf(0), last: tt.dateOf(tt.nDays - 1) }) + ' ' + t('foot.map');
 }
 
 function fillDates(wantedIso) { fillDateSelect($('#date'), wantedIso); }

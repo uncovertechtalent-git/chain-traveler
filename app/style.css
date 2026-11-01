@@ -126,3 +126,26 @@ button.follow{margin-top:8px}
 .pb .me.halo{fill:var(--accent);fill-opacity:.25;stroke:none}
 .pb text.me{fill:var(--accent)}
 .navgraph{margin:10px 0 0}
+/* the map behind the graphs (Natural Earth, public domain) and the controls of the graph */
+:root{--water:#d5e5ee;--land:#e9e6d9;--land-de:#faf8f1;--border:#aaa48f;--river:#86b0c8}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--water:#0f171d;--land:#1d2228;--land-de:#2a3037;--border:#555c66;--river:#34556c}}
+:root[data-theme="dark"]{--water:#0f171d;--land:#1d2228;--land-de:#2a3037;--border:#555c66;--river:#34556c}
+.pb.hasmap{background:var(--water)}
+.pb .bm path{stroke-linejoin:round;stroke-linecap:round}
+.pb .bm-other{fill:var(--land);stroke:var(--border);stroke-width:.8}
+.pb .bm-de{fill:var(--land-de);stroke:var(--border);stroke-width:1.4}
+.pb .bm-state{fill:none;stroke:var(--border);stroke-width:.8}
+.pb .bm-lake{fill:var(--water);stroke:var(--river);stroke-width:.6}
+.pb .bm-river{fill:none;stroke:var(--river);stroke-width:1}
+.pb.hasmap text{stroke:var(--land-de);stroke-opacity:.8}
+.pb text.hub.city{font-style:italic;font-size:10.5px;letter-spacing:.02em}
+.zoomwrap{position:relative;outline:none;touch-action:pan-y}
+.zoomwrap.zoomed{touch-action:none}
+.zoomwrap:focus-visible .zpic{outline:2px solid var(--accent);outline-offset:2px;border-radius:10px}
+.zpic{cursor:grab;user-select:none;-webkit-user-select:none}
+.zoomwrap.grab .zpic{cursor:grabbing}
+.zbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0 0}
+.zbtn{min-width:40px;min-height:36px;padding:2px 12px}
+.zmap{flex-direction:row;align-items:center;gap:6px;margin-left:auto;font-size:.85rem;color:var(--text);cursor:pointer}
+.zmap input{width:auto;min-height:0;margin:0}
+.zhint{margin:6px 0 0}
