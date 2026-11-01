@@ -111,3 +111,13 @@ button.near{min-height:30px;padding:2px 10px;font-size:.85rem;margin:2px 0}
 .pb .cl{fill:none;stroke:var(--muted);stroke-width:1;opacity:.35}
 .pb .cx{fill:var(--muted);opacity:.5}
 .pb text.hub{fill:var(--muted);font-size:10px}
+.navcard{border-color:var(--accent);background:var(--accent-soft)}
+.navhead{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.navhead .mini-btn{margin-left:auto}
+.navnow{font-size:1.15rem;font-weight:600;margin:10px 0 4px}
+.navbtns{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}
+.navbanner{margin:8px 0}
+.navstart{margin:10px 0 0}
+.navtest{margin:6px 2px 12px}
+button.mini-btn,button.follow{min-height:32px;padding:2px 12px;font-size:.85rem}
+button.follow{margin-top:8px}
