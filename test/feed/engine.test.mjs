@@ -13,6 +13,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Timetable, fmt, INF } from '../../app/engine.js';
+import { plan as planB, bandOf } from '../../app/planb.js';
 
 // The data directory is laid out as on the CDN: latest.json names the dated build next to it. CT_DATA_DIR overrides app/data.
 const dataDir = process.env.CT_DATA_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'app', 'data');
@@ -108,4 +109,37 @@ test('a train that crosses midnight is found (late departure on a Friday)', () =
 test('station search ranks the main station first', () => {
   const hits = tt.search('muenchen hbf', 3).map(i => tt.names[i]);
   assert.equal(hits[0], 'München Hbf');
+});
+
+// Plan B on the real timetable: the planned first train is out, and the ways on come back ordered, against the plan,
+// quickly enough to use on a platform.
+test('Plan B with nothing out reproduces the planned chain', () => {
+  const src = st('Wolfsburg Hbf'), dst = st('Leipzig Hbf');
+  const planned = tt.plan({ day: wednesday, src, dst, t0: min('06:00') });
+  assert.ok(!planned.error, planned.error);
+  const r = planB(tt, { day: wednesday, src, dst, t0: min('06:00') });
+  assert.equal(r.options[0].arr, planned.legs.at(-1).arr);
+  assert.equal(r.options[0].delta, 0);
+});
+
+test('Plan B with the planned first train out gives ordered, later or equal ways, in well under a second', () => {
+  const src = st('Wolfsburg Hbf'), dst = st('Leipzig Hbf');
+  const planned = tt.plan({ day: wednesday, src, dst, t0: min('06:00') });
+  const first = planned.legs.find(l => !l.walk);
+  const out = new Set([tt.tripKey(first.svcDay, first.trip)]);
+  const t = performance.now();
+  const r = planB(tt, { day: wednesday, src, dst, t0: first.dep, plannedArr: planned.legs.at(-1).arr, exclude: out });
+  const ms = performance.now() - t;
+  assert.ok(!r.error, r.error);
+  assert.ok(ms < 1500, 'took ' + ms.toFixed(0) + ' ms');
+  assert.ok(r.options.length >= 1);
+  for (let i = 0; i < r.options.length; i++) {
+    const o = r.options[i];
+    assert.ok(o.arr >= planned.legs.at(-1).arr, 'cannot beat the plan the earliest chain made');
+    assert.equal(o.delta, o.arr - planned.legs.at(-1).arr);
+    assert.equal(o.band, bandOf(o.delta));
+    assert.ok(o.perLeg.every((n, k) => o.legs[k].walk ? n === 0 : n >= 1), 'every ride has at least its own train an hour');
+    assert.ok(!o.legs.some(l => !l.walk && tt.tripKey(l.svcDay, l.trip) === tt.tripKey(first.svcDay, first.trip)), 'the cancelled run is not used');
+    if (i > 0) assert.ok(o.arr >= r.options[i - 1].arr, 'earliest arrival first');
+  }
 });

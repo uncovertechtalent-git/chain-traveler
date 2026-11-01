@@ -1,12 +1,13 @@
 import { Timetable, fmt, dur, INF } from './engine.js';
 import { DataStore, gunzip, describeAge } from './data-store.js';
+import { initLive } from './live.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const toMin = v => { const [h, m] = (v || '06:00').split(':').map(Number); return h * 60 + m; };
 
 const DEFAULTS = { date: '', src: '', dst: '', via: '', t0: '06:00', stay: 180, tr: 4 };
-let tt, state, store, manifest, uiReady = false, lastCheck = 0, lastPlan = null, reachCache = null;
+let tt, state, store, manifest, uiReady = false, lastCheck = 0, lastPlan = null, reachCache = null, live = null;
 
 function loadState() {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('ct-state') || '{}') }; } catch { return { ...DEFAULTS }; }
@@ -106,7 +107,7 @@ function renderChain(res, q) {
     }
     if (ld !== curDay) { curDay = ld; h += `<li class="wait"><b>${esc(dayName(q.day, l.dep))}</b></li>`; }
     if (l.walk) h += `<li class="leg walk">Walk ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="mute">${l.arr - l.dep} min</span></li>`;
-    else h += `<li class="leg"><span class="t">${hm(l.dep)}</span> ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="line">${esc(l.line)}</span><span class="t">${hm(l.arr)}</span> <span class="mute">towards ${esc(tt.names[l.term])}, ${dur(l.arr - l.dep)}</span></li>`;
+    else h += `<li class="leg"><span class="t">${hm(l.dep)}</span> ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="line">${esc(l.line)}</span><span class="t">${hm(l.arr)}</span> <span class="mute">towards ${esc(tt.names[l.term])}, ${dur(l.arr - l.dep)}</span> <button type="button" class="out" data-leg="${i}">This train is out</button></li>`;
   });
   h += '</ol><details open><summary>Next trains at each stop</summary>';
   legs.forEach((l, i) => {
@@ -200,12 +201,13 @@ function drawDeps() {
 
 // ---- tabs ----
 function showTab(name) {
-  for (const t of ['chain', 'reach', 'deps']) {
+  for (const t of ['chain', 'reach', 'deps', 'live']) {
     $('#pane-' + t).hidden = t !== name;
     $('#tab-' + t).setAttribute('aria-selected', t === name ? 'true' : 'false');
   }
   if (name === 'reach') drawReach();
   if (name === 'deps') { if (pDep.get() < 0) pDep.set(pSrc.get()); drawDeps(); }
+  if (name === 'live') live.open(pSrc.get(), pDst.get());
 }
 
 // ---- timetable data: load from the device, update in the background ----
@@ -220,8 +222,9 @@ function showAge(note) {
   el.hidden = false;
 }
 
-function fillDates(wantedIso) {
-  const sel = $('#date');
+function fillDates(wantedIso) { fillDateSelect($('#date'), wantedIso); }
+
+function fillDateSelect(sel, wantedIso) {
   sel.innerHTML = '';
   for (let d = 0; d < tt.nDays; d++) {
     const iso = tt.dateOf(d);
@@ -246,6 +249,7 @@ function adopt(cur, next) {
   fillDates(keep.iso);
   if (!uiReady) initUi();
   pSrc.set(tt.find(keep.src)); pDst.set(tt.find(keep.dst)); pVia.set(keep.via ? tt.find(keep.via) : -1); pDep.set(keep.dep ? tt.find(keep.dep) : -1);
+  live.onTimetable();
   const f = tt.meta.feed;
   $('#foot').textContent = `Timetable: ${f.publisher}, ${f.license}. ${tt.nStations.toLocaleString('en')} stations, ${tt.nConn.toLocaleString('en')} connections, ${tt.dateOf(0)} to ${tt.dateOf(tt.nDays - 1)}. Planned times only, no delays or engineering works. Check the trip in DB Navigator before you travel.`;
   $('#status').hidden = true;
@@ -290,6 +294,7 @@ function initUi() {
   pDst = picker($('#dst'), () => runPlan());
   pVia = picker($('#via'), () => runPlan());
   pDep = picker($('#dstation'), () => drawDeps());
+  live = initLive({ $, esc, picker, getTt: () => tt, hm, toMin, today: berlinToday, fillDateSelect, minTransfer: () => Math.max(0, +$('#tr').value || 0) });
   $('#t0').value = state.t0; $('#stay').value = state.stay; $('#tr').value = state.tr;
   $('#dtime').value = state.t0;
 
@@ -301,6 +306,13 @@ function initUi() {
   $('#tab-chain').onclick = () => showTab('chain');
   $('#tab-reach').onclick = () => showTab('reach');
   $('#tab-deps').onclick = () => showTab('deps');
+  $('#tab-live').onclick = () => showTab('live');
+  $('#pane-chain').addEventListener('click', ev => {
+    const b = ev.target.closest('button.out');
+    if (!b || !lastPlan || !lastPlan.res.legs) return;
+    showTab('live');
+    live.fromChain(lastPlan, +b.dataset.leg);
+  });
   $('#hrs').addEventListener('input', () => { $('#hrs-val').textContent = $('#hrs').value; drawReach(); });
   $('#dtime').addEventListener('change', drawDeps);
   $('#date').addEventListener('change', drawDeps);

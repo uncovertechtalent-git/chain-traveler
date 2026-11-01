@@ -1,0 +1,125 @@
+// The Plan B tab: "my train is out, where do I go from here". Reads its own inputs, asks app/planb.js for the ways on,
+// and draws them (app/graph.js) next to a list. The page helpers come from app.js through initLive().
+import { dur } from './engine.js';
+import { plan, graphOf, GOOD_MIN, LATE_MIN } from './planb.js';
+import { svgOf } from './graph.js';
+
+const WORD = { good: 'on plan', mid: 'late', bad: 'much later' };
+
+export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSelect, minTransfer }) {
+  const pSrc = picker($('#lsrc'), () => { forget(); run(); });
+  const pDst = picker($('#ldst'), () => { forget(); run(); });
+  let out = new Set();     // runs marked as out (engine tripKey values)
+  let ghost = null;        // the legs of the original plan still ahead, when we came from the chain view
+  let dayIso = '';         // the chosen date, kept as a date because day numbers change with the timetable
+  let drawnWidth = 0;      // the width the graph was last drawn at
+
+  const forget = () => { out = new Set(); ghost = null; };
+  const nowHm = () => new Date().toLocaleTimeString('sv-SE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
+
+  // What the chip says. Against a plan: on plan, early, late, much later. Without one: the best way and how far the others trail it.
+  function chipText(o, baseKind) {
+    if (baseKind === 'best') {
+      return o.delta <= 0 ? 'best way' : `${{ good: 'close to the best', mid: 'later', bad: 'much later' }[o.band]}, +${dur(o.delta)}`;
+    }
+    if (o.delta < 0) return `on plan, ${dur(-o.delta)} early`;
+    if (o.delta === 0) return 'on plan';
+    return `${WORD[o.band]}, +${dur(o.delta)}`;
+  }
+
+  function legLines(tt, o) {
+    return '<ol class="mini">' + o.legs.map((l, i) => (l.walk
+      ? `<li class="walk">Walk ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="mute">${l.arr - l.dep} min</span></li>`
+      : `<li><span class="t">${hm(l.dep)}</span> ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="line">${esc(l.line)}</span><span class="t">${hm(l.arr)}</span> <span class="mute">${o.perLeg[i]}/h</span></li>`)).join('') + '</ol>';
+  }
+
+  function optionHtml(tt, o, baseKind) {
+    const meta = [`leave ${hm(o.dep)}`, `${o.changes} change${o.changes === 1 ? '' : 's'}`];
+    if (o.tightest !== null) meta.push(`tightest change ${o.tightest} min`);
+    meta.push(`thinnest leg ${o.thinnest} train${o.thinnest === 1 ? '' : 's'} an hour`);
+    return `<li class="opt ${o.band}"><div class="head"><b class="t">${hm(o.arr)}</b> arrive <span class="chip ${o.band}">${esc(chipText(o, baseKind))}</span>${o.tags.map(t => ` <span class="tag">${esc(t)}</span>`).join('')}</div><div class="mute">${esc(meta.join(' · '))}</div>${legLines(tt, o)}</li>`;
+  }
+
+  const legend = baseKind => `<p class="legend2"><span class="chip good">green</span> up to ${GOOD_MIN} min after ${baseKind === 'plan' ? 'your plan' : 'the best way'} <span class="chip mid">amber</span> up to ${LATE_MIN} min <span class="chip bad">red</span> beyond that. Line thickness: trains an hour on that leg, from one (thin) to four or more (thick).${baseKind === 'plan' ? ' The dotted line: the plan you had.' : ''}</p>`;
+
+  function run() {
+    const tt = getTt();
+    const src = pSrc.get(), dst = pDst.get();
+    const deps = $('#ldeps'), res = $('#lres');
+    if (!tt || src < 0 || dst < 0) {
+      deps.innerHTML = '';
+      res.innerHTML = '<p class="note">Say where you are and where you are going.</p>';
+      return;
+    }
+    const day = +$('#ldate').value, t0 = toMin($('#lt0').value);
+    dayIso = tt.dateOf(day);
+    let planned = null;
+    if ($('#lplan').value) { planned = toMin($('#lplan').value); if (planned < t0) planned += 1440; }
+
+    const list = tt.departures({ day, station: src, t: t0, limit: 8 });
+    const listed = new Set(list.map(d => tt.tripKey(d.svcDay, d.trip)));
+    const unlisted = [...out].filter(k => !listed.has(k)).length;
+    deps.innerHTML = list.length
+      ? `<h3>Trains from ${esc(tt.names[src])} after ${hm(t0)}</h3><p class="note">Tick the ones that are out.${unlisted ? ` ${unlisted} more marked out earlier, not in this list.` : ''}</p><ul class="outs">${list.map(d => {
+        const k = tt.tripKey(d.svcDay, d.trip);
+        return `<li><label class="outl"><input type="checkbox" data-k="${k}"${out.has(k) ? ' checked' : ''}> <span class="t">${hm(d.dep)}</span> <span class="line">${esc(d.line)}</span> towards ${esc(tt.names[d.term])}</label></li>`;
+      }).join('')}</ul>`
+      : '';
+
+    const result = plan(tt, { day, src, dst, t0, plannedArr: planned, exclude: out, minTransfer: minTransfer() });
+    if (result.error) { res.innerHTML = `<div class="err">${esc(result.error)}</div>`; return; }
+    const first = result.options[0];
+    const lead = result.baseKind === 'plan'
+      ? `Your plan arrived at ${hm(result.base)}. The best way on now arrives at ${hm(first.arr)}${first.delta > 0 ? `, ${dur(first.delta)} later` : ''}.`
+      : `No planned arrival given, so the best way on (arriving ${hm(first.arr)}) is the yardstick.`;
+    const model = graphOf(tt, result, { ghost });
+    // The graph is drawn at the width it is shown at, so its text keeps its size on a phone; the box is taller there.
+    drawnWidth = Math.max(300, Math.min(720, res.clientWidth || 720));
+    const svg = svgOf(model, { width: drawnWidth, height: Math.round(drawnWidth * (drawnWidth < 500 ? 1.15 : 0.72)), label: `Ways from ${tt.names[src]} to ${tt.names[dst]}` });
+    res.innerHTML = `<p class="lead2">${esc(lead)}</p>${svg}${legend(result.baseKind)}<ol class="opts">${result.options.map(o => optionHtml(tt, o, result.baseKind)).join('')}</ol>`;
+  }
+
+  $('#ldeps').addEventListener('change', ev => {
+    const box = ev.target.closest('input[type=checkbox]');
+    if (!box) return;
+    const k = +box.dataset.k;
+    if (box.checked) out.add(k); else out.delete(k);
+    run();
+  });
+  for (const id of ['ldate', 'lt0', 'lplan']) $('#' + id).addEventListener('change', run);
+  window.addEventListener('resize', () => { if (!$('#pane-live').hidden && Math.abs(($('#lres').clientWidth || 0) - drawnWidth) > 40) run(); });
+
+  return {
+    // The tab opens: fill what is empty from the chain form, the date from today, the time from the clock.
+    open(mainSrc, mainDst) {
+      const tt = getTt();
+      if (!$('#ldate').options.length) fillDateSelect($('#ldate'), today());
+      if (!$('#lt0').value) $('#lt0').value = nowHm();
+      if (pSrc.get() < 0 && mainSrc >= 0) pSrc.set(mainSrc);
+      if (pDst.get() < 0 && mainDst >= 0) pDst.set(mainDst);
+      if (tt) run();
+    },
+    // From the chain view: this leg's train is out. We stand at its boarding station at its departure time.
+    fromChain(lastPlan, i) {
+      const tt = getTt(), { res, q } = lastPlan, leg = res.legs[i], last = res.legs[res.legs.length - 1];
+      const shift = Math.floor(leg.dep / 1440);
+      forget();
+      fillDateSelect($('#ldate'), tt.dateOf(Math.min(tt.nDays - 1, q.day + shift)));
+      $('#lt0').value = hm(leg.dep);
+      $('#lplan').value = hm(last.arr);
+      pSrc.set(leg.from); pDst.set(q.dst);
+      out.add(tt.tripKey(leg.svcDay, leg.trip));
+      ghost = res.legs.slice(i).filter(l => !l.walk).map(l => ({ from: l.from, to: l.to }));
+      run();
+    },
+    // A new timetable replaced the old one: station numbers changed, so look the names up again.
+    onTimetable() {
+      const tt = getTt();
+      forget();
+      if ($('#ldate').options.length) fillDateSelect($('#ldate'), dayIso);
+      pSrc.set($('#lsrc').value ? tt.find($('#lsrc').value) : -1);
+      pDst.set($('#ldst').value ? tt.find($('#ldst').value) : -1);
+      if (!$('#pane-live').hidden) run();
+    },
+  };
+}

@@ -13,6 +13,7 @@ Licence: MIT. Timetable data: gtfs.de, data provided by DELFI e.V., CC BY 4.0 (s
 | Chain | Earliest chain of trains from a start to a target station after a time, on a chosen date. Optional stop-over with a minimum stay: it arrives at the stop-over as early as possible, waits out the stay, then chains onward as early as possible. Walks between nearby stations, tight changes flagged, and the next trains at every stop so you can swap the plan on the day. |
 | Reach map | Every station as a dot, coloured by how soon you can be there from the start. Click a dot to chain a trip there. |
 | Departures | The next trains at any station after a time. |
+| Plan B | "My train is out." From where you are, now, to where you are going: the ways on, each set against your plan, drawn as a graph (stations at their real positions, green, amber and red for how late, line thickness for trains an hour) and listed with their changes and tightest change. Press "This train is out" on a leg of a chain to start from there, or open the tab and say where you are. |
 
 ## Run it
 
@@ -54,6 +55,27 @@ timetable, and it opens offline. On a phone, use "Add to Home Screen".
 3. `app/app.js` is the interface: station search, chain view, reach map on a canvas, departures.
 4. `app/sw.js` is the service worker: the shell is network-first with a cache fallback, the timetable is
    cache-first.
+
+## Plan B
+
+`app/planb.js` (the logic), `app/graph.js` (the SVG) and `app/live.js` (the tab). All of it works offline on the
+timetable on the device, in tens of milliseconds.
+
+1. **The ways on.** You are at a station at a time and some trains are out. The engine skips those runs (a run is a
+   trip on one service day, so a cancelled 06:23 does not touch the 06:23 of the next day) and finds the earliest
+   chain; then it asks again for the earliest chain that leaves after the first train of the previous one, up to four
+   distinct ways inside three hours of the best arrival.
+2. **Colour.** How much later than your plan a way arrives, if every train on it runs as planned: green up to 15
+   minutes, amber up to 60, red beyond. Without a planned arrival the best way is the yardstick. Every way also says
+   it in words ("on plan", "late, +1 h 00 min"), so colour is never the only carrier.
+3. **Thickness.** Trains an hour on a leg: the runs that leave the boarding station within half an hour either way and
+   call at the alighting station. One is thin, four or more is thick. It says how many fallbacks you have if you miss
+   that leg.
+4. **Not a probability.** The feed has planned times only: no delays, no cancellations. "Trains an hour" is the
+   structure of the timetable, not the chance that a train runs. A real "how likely" needs live data (gtfs.de offers
+   GTFS-RT as a separate service), which this does not use. Which trains are out is what you tick.
+5. **Where you are.** You pick the station. Using the device's location needs a change to the site's
+   Permissions-Policy and the browser's permission, and is a separate step.
 
 ## Hosting and data pipeline
 
@@ -123,9 +145,9 @@ next step if the threat model ever needs it.
 
 | Suite | Runs | Covers |
 |---|---|---|
-| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. Deterministic, no network. |
+| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG. Deterministic, no network. |
 | `test/build/` | on every pull request (Python `unittest`) | The manifest and its checks (changed byte, truncated or missing file, malformed fields), retention of three builds, and `scripts/ci/deploy-shell.sh` and `publish-data.sh` against a fake AWS CLI: the shell deploy never writes under `data/`, the publish never writes outside it, the pointer is written last, a same-day build with other bytes is refused, a damaged upload leaves the old pointer. |
-| `test/feed/` | before a timetable build is published, and locally after `scripts/fetch-feed.sh` | The engine on the real national timetable: size and age of the window, named chains (Wolfsburg to Leipzig and München, München to Wolfsburg via Nürnberg, Wolfsburg to München via Leipzig), the Leipzig footpath, a train past midnight, station search. Days come from the data, bounds are generous ceilings. |
+| `test/feed/` | before a timetable build is published, and locally after `scripts/fetch-feed.sh` | The engine on the real national timetable: size and age of the window, named chains (Wolfsburg to Leipzig and München, München to Wolfsburg via Nürnberg, Wolfsburg to München via Leipzig), the Leipzig footpath, a train past midnight, station search, and Plan B with the planned first train out (ordered ways, none of them the cancelled run, well under a second). Days come from the data, bounds are generous ceilings. |
 
 ## Known limits and next steps
 

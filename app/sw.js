@@ -11,7 +11,7 @@
 // never touched, so the update check always sees the live manifest.
 const VERSION = '__SHELL_VERSION__';
 const SHELL_CACHE = 'ct-shell-' + VERSION;
-const SHELL = ['./', 'index.html', 'app.js', 'engine.js', 'data-store.js', 'style.css', 'manifest.webmanifest', 'icon.svg'];
+const SHELL = ['./', 'index.html', 'app.js', 'engine.js', 'data-store.js', 'planb.js', 'graph.js', 'live.js', 'style.css', 'manifest.webmanifest', 'icon.svg'];
 const DATED_BUILD = /\/data\/\d{4}-\d{2}-\d{2}\//;
 // Lookups in our own caches ignore Vary. The CDN answers every file with "Vary: Origin", and Chrome adds an Origin
 // header to module-script requests, so a file stored at install (a plain request) would not match its own module
