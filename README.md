@@ -4,7 +4,8 @@ Chain the next regional trains between any two German stations on the Deutschlan
 stop-over, and see where you can get to by when. A progressive web app: the whole timetable lives on the
 device, so it plans offline in tens of milliseconds. No account, no tracking, no ads, no server.
 
-Licence: MIT. Timetable data: gtfs.de, data provided by DELFI e.V., CC BY 4.0 (see "Data and attribution").
+Licence: MIT. Timetable data: gtfs.de, data provided by DELFI e.V., CC BY 4.0 (see "Data and attribution"). Live delays,
+where a train has them: gtfs.de realtime stream, CC BY-SA 4.0 (see "Delays").
 
 ## What it does
 
@@ -38,7 +39,8 @@ timetable, and it opens offline. On a phone, use "Add to Home Screen".
   consecutive stops, footpaths within 300 m); no other change.
 - Content: every regional train (RE, RB, S-Bahn, regional tram) in Germany, about 107,000 trips and 7,600
   stations, a rolling window of 31 days from the day the feed was generated.
-- Planned times only. No delays, cancellations or engineering works. International trains are not in it.
+- Planned times only. No delays, cancellations or engineering works in the timetable itself; the live delays of some
+  trains are a separate overlay, see "Delays". International trains are not in it.
 - The Deutschlandticket covers these trains and no ICE or IC; long-distance trains are not in the feed.
 
 ## How it works
@@ -71,9 +73,10 @@ timetable on the device, in tens of milliseconds.
 3. **Thickness.** Trains an hour on a leg: the runs that leave the boarding station within half an hour either way and
    call at the alighting station. One is thin, four or more is thick. It says how many fallbacks you have if you miss
    that leg.
-4. **Not a probability.** The feed has planned times only: no delays, no cancellations. "Trains an hour" is the
-   structure of the timetable, not the chance that a train runs. A real "how likely" needs live data (gtfs.de offers
-   GTFS-RT as a separate service), which this does not use. Which trains are out is what you tick.
+4. **Not a probability.** The timetable has planned times only: no delays, no cancellations. "Trains an hour" is the
+   structure of the timetable, not the chance that a train runs. A real "how likely" needs live data for every train,
+   which nobody gives us: the live marks (see "Delays") cover some trains and do not change the ways or the colours.
+   Which trains are out is what you tick.
 5. **Where you are.** Pick the station, or press "Use my location": the device is asked for its position once (no
    tracking, nothing stored or sent), the nearest stations that have trains within 40 km are listed with their distance,
    the nearest is filled in, and the date and time are set to now. It works offline, from the device's own positioning.
@@ -89,6 +92,72 @@ of up to four busy stations that are not near a station on a way. It is context,
 trains from here go. It uses the same positions as the ways, only what falls inside the picture is drawn, and the ways
 stay on top. It costs one more scan of the timetable (about 80 ms on a laptop), so the ways are drawn first and the
 network follows a moment later; it is kept for a redraw with the same inputs.
+
+## Delays
+
+Where a train has live data, its leg carries a small mark: "live +12 min", "live on time", "live 3 min early",
+"live cancelled", "live 2 stops skipped". It shows in the chain view and in Plan B (on the legs of every way, and next
+to the trains in the list you tick from). The data is the gtfs.de GTFS-Realtime stream
+(`https://realtime.gtfs.de/realtime-free.pb`): free, beta, no guarantee, CC BY-SA 4.0, updated every 10 seconds, 13 MB,
+no CORS header, so a browser cannot read it. A scheduled job cuts it down to `data/delays.json` (about 70 KB) on the
+app's own origin.
+
+**What it does not do**
+
+- **Planned times still drive the routing.** The engine never sees a delay. A late train does not change the ways, the
+  change checks or the Plan B colours ("late" there still means late if every train runs as planned); a cancelled leg
+  stays in the plan with its mark, and "This train is out?" is still what replans.
+- **A leg without a mark has no data, which is not "on time".** Coverage is partial, and the app says so under every list
+  of legs. Measured on Sunday 1 November 2026, 12:20 in Berlin (one snapshot; a weekday and other hours will differ):
+  of the 48,938 trip updates in the stream, 6,900 (14%) are trips of our timetable, the rest are buses, trams and other
+  trains; 20% of that day's runs in the timetable (6,796 of 33,852) had an update at all; for the runs still to come, the
+  share falls with the horizon: 87% for trains running, 72% for those starting within the hour, 35% within one to three
+  hours, 7% within three to six, 1% beyond. Hannover Hbf 38% of the day's runs, Leipzig Hbf and Magdeburg Hbf 20%;
+  Wolfsburg Hbf has two runs on a Sunday and none had data, and its two operators have data for a quarter of their other
+  runs still to come. 33 of 213 operators have none. It is useful for the next hour or two, not for planning tomorrow.
+- **One number per run.** The delay is the latest known one for the run (the last stop whose time is not after the
+  stream's timestamp; else the departure from the first stop the stream lists), not the delay at your stops. A run
+  that is cancelled, or every stop of which is skipped (how the stream cancels in practice), is marked cancelled.
+- It is a snapshot of up to a few minutes: the job runs every five minutes, the CDN keeps the file 30 seconds, the app
+  asks every two minutes while the page is visible. A file whose stream timestamp is older than 15 minutes, dated ahead of
+  the device's clock, malformed, or made for another timetable build is ignored, offline too: then there are no marks.
+  The service worker never caches it.
+
+**How a stream entry becomes a mark**
+
+1. The stream names a run by the feed's `trip_id` and the service day. The CHT1 binary drops the ids and keeps trip
+   numbers, so the daily build also writes `trip-ids.txt.gz` (line n: the feed's id of trip number n, and the minute its
+   first stop is left; 0.58 MB, bound to the manifest by `tripIdsSha256` and `tripIdsBytes`, published beside the build).
+   The app never downloads it. Choosing this over a map the app loads, or over a key the app computes (line, first stop,
+   first departure, day): the job needs a lookup either way, because the stream has neither line nor station names; with
+   the lookup in the job the app needs no map, no extra download and no matching code, and `timetable.bin.gz` is
+   byte-identical to before.
+2. `.github/workflows/realtime.yml`, every five minutes (and by hand): the `cut` job, with no cloud access, downloads the
+   stream (gzip, 5 MB) and the published `latest.json` and trip ids from the CDN, and `build/realtime.py` writes
+   `delays.json`: per run, keyed by service day and trip number, the delay in whole minutes, the cancelled runs and the
+   skipped stops, with the stream's timestamp, the source and licence, and the build it was made for (date and sha256 of
+   `timetable.bin.gz`). Stale or unreadable input, and a stream whose first stops disagree with the build's (it comes from
+   another version of the static feed), end the run green with nothing published. The `publish` job, keyless through
+   the data role, whose script writes only `data/delays.json`, checks the file again, never replaces a newer one with an older
+   one, uploads it with `Cache-Control: public, max-age=30` and reads it back. The CDN needs no rule of its own for
+   `/data/delays.json`.
+3. `app/delays.js` fetches the file from the app's own origin (`cache: 'no-store'`), checks it, and marks legs by service
+   day and trip number. Nothing in `app/delays.js` reaches another host.
+
+Dry run on your machine: `scripts/fetch-delays.sh https://<site>` writes `app/data/delays.json` (needs a published build
+that has trip ids: the first daily build after this change; a build that has none gives "nothing to publish").
+
+**Licence and attribution.** The stream is CC BY-SA 4.0 (share-alike). `delays.json` is an adaptation of it (reduced to
+whole minutes per run and matched to our trips) and says so, names the source and carries the licence; it is offered under
+the same licence. The app footer carries "Live delays: gtfs.de, realtime stream, CC BY-SA 4.0 (link), as of HH:MM"
+while delays are in use. The app code stays MIT and the timetable stays CC BY 4.0. Whether showing the delays in the app
+makes the app itself an adaptation, and so share-alike, is an open question (this is not legal advice).
+
+**Cost.** One run every five minutes is 288 a day, two short jobs each, on GitHub-hosted runners (free for a public
+repository; GitHub starts scheduled runs late under load and switches them off after 60 days without repository activity).
+Per run: 5 MB from gtfs.de, 0.6 MB from our CDN, three small S3 requests. Per device: 70 KB every two minutes while the
+page is visible, about 2 MB an hour. To switch it off, disable the Realtime workflow; the file ages out in 15 minutes and
+the app shows no marks.
 
 ## Languages
 
@@ -121,6 +190,7 @@ change or a store review.
 |---|---|---|---|
 | App shell (`app/`, not `data/`) | push to `main`, after the owner approves the `production` environment | `deploy.yml`: tests, then `scripts/ci/deploy-shell.sh` | `chaintraveler-app-github-deploy`: trusts the `production` environment of this repository; writes the shell objects, denied `data/*`; invalidates one distribution |
 | Timetable (`data/`) | daily at 11:17 UTC, and by hand | `timetable.yml`: fetch the gtfs.de feed, build, feed tests, manifest; then `scripts/ci/publish-data.sh` | `chaintraveler-app-github-data`: trusts the `main` branch of this repository; reads and writes `data/*` only |
+| Live delays (`data/delays.json`) | every 5 minutes, and by hand | `realtime.yml`: fetch the gtfs.de realtime stream, `build/realtime.py`; then `scripts/ci/publish-delays.sh` | the same data role; the script writes that one key |
 
 How a timetable build moves, and what stops a bad one:
 
@@ -128,7 +198,8 @@ How a timetable build moves, and what stops a bad one:
    (`npm run test:feed`: size and age of the window, named chains, a midnight crossing). A failing gate stops
    the run before anything is published, and the previous build stays current.
 2. **Manifest.** `build/manifest.py make` writes `data/<date>/timetable.bin.gz` and `meta.json` and
-   `data/latest.json`: `{format, date, sha256, bytes, metaSha256, metaBytes, firstDate, nDays, built, feedSha256}`.
+   `data/latest.json`: `{format, date, sha256, bytes, metaSha256, metaBytes, firstDate, nDays, built, feedSha256}`, and
+   `tripIdsSha256`, `tripIdsBytes` for `trip-ids.txt.gz`, the sidecar the live delays are matched with (see "Delays").
 3. **Publish job, no third-party code.** It downloads the artifact and checks it against the manifest, skips when
    the feed behind the current `latest.json` is unchanged, refuses to overwrite a dated path with other bytes,
    uploads `data/<date>/` with `Cache-Control: public, max-age=31536000, immutable`, reads it back and verifies it,
@@ -136,8 +207,9 @@ How a timetable build moves, and what stops a bad one:
 4. **Rollback.** Run the Timetable workflow by hand with `rollback_to` set to a kept build (`YYYY-MM-DD`): the
    files are verified and `latest.json` points back at them. Nothing is deleted.
 
-Until the infrastructure exists, `build` runs as a dry run and `publish`, `rollback` and `deploy` are skipped.
-Set the repository variable `S3_DEPLOY` to `on` to enable them. They also need `SITE_BUCKET`,
+Until the infrastructure exists, `build` runs as a dry run and `publish`, `rollback` and `deploy` are skipped (the
+Realtime workflow does not run at all: it reads the published build). Set the repository variable `S3_DEPLOY` to `on` to
+enable them. They also need `SITE_BUCKET`,
 `CLOUDFRONT_DISTRIBUTION_ID` and `AWS_DATA_ROLE_ARN` as repository secrets and `AWS_DEPLOY_ROLE_ARN` as a secret
 of the `production` environment (outputs of the site-infra bootstrap and site stacks; none is a credential, they
 are secrets so that the log masks the account id).
@@ -177,8 +249,8 @@ next step if the threat model ever needs it.
 
 | Suite | Runs | Covers |
 |---|---|---|
-| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search, the stations nearest to a position. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG; the network around a journey on a small star network (`context.test.mjs`): the earliest-arrival tree, walks, the time cut, runs marked out, and how the SVG draws it. Deterministic, no network. The languages (`i18n.test.mjs`): same keys, placeholders and plural forms in every locale, no markup, and every key used. |
-| `test/build/` | on every pull request (Python `unittest`) | The manifest and its checks (changed byte, truncated or missing file, malformed fields), retention of three builds, and `scripts/ci/deploy-shell.sh` and `publish-data.sh` against a fake AWS CLI: the shell deploy never writes under `data/`, the publish never writes outside it, the pointer is written last, a same-day build with other bytes is refused, a damaged upload leaves the old pointer. |
+| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search, the stations nearest to a position. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG; the network around a journey on a small star network (`context.test.mjs`): the earliest-arrival tree, walks, the time cut, runs marked out, and how the SVG draws it. Deterministic, no network. The languages (`i18n.test.mjs`): same keys, placeholders and plural forms in every locale, no markup, and every key used. The live delays (`delays.test.mjs`): the file checks (format, build, stale, ahead of the clock, malformed), every way the fetch can fail, the overlay on a fake timetable (legs found by service day, the plan unchanged), the words and bands of a mark. |
+| `test/build/` | on every pull request (Python `unittest`) | The manifest and its checks (changed byte, truncated or missing file, malformed fields), retention of three builds, and `scripts/ci/deploy-shell.sh`, `publish-data.sh` and `publish-delays.sh` against a fake AWS CLI: the shell deploy never writes under `data/`, the publish never writes outside it, the pointer is written last, a same-day build with other bytes is refused, a damaged upload leaves the old pointer; the delays publish writes one key, never an older file over a newer one. The trip id file against the binary (`test_build_timetable.py`). The stream reader and the cut (`test_realtime.py`, protobuf messages encoded by hand: wire format, malformed input, matching, cancelled and skipped, latest known delay, stale streams, a stream of another feed version), and `scripts/fetch-delays.sh` against a fake `curl`. |
 | `test/feed/` | before a timetable build is published, and locally after `scripts/fetch-feed.sh` | The engine on the real national timetable: size and age of the window, named chains (Wolfsburg to Leipzig and München, München to Wolfsburg via Nürnberg, Wolfsburg to München via Leipzig), the Leipzig footpath, a train past midnight, station search, and Plan B with the planned first train out (ordered ways, none of them the cancelled run, well under a second). Days come from the data, bounds are generous ceilings. |
 
 ## Known limits and next steps
@@ -186,12 +258,14 @@ next step if the threat model ever needs it.
 - Rail only. Buses, trams and U-Bahn (first and last mile) come from a much larger feed (gtfs.de
   "Nahverkehr") and need a regional cut; that is a separate step.
 - Weekend gaps are real data, not bugs: some stations have no regional service on Saturdays or Sundays.
-- No live delays. gtfs.de offers GTFS-RT as a separate service.
+- Live delays only where the gtfs.de realtime stream has them (see "Delays"): none for most trains more than a few
+  hours ahead, none for some operators at all. Everything else, the routing included, is planned times.
 
 ## Privacy
 
-The app has no account, no analytics script and no request to anyone but its own origin. It keeps in your browser only
-the timetable and your last inputs. The position that Plan B reads stays on the device. The CDN that serves the files
+The app has no account, no analytics script and no request to anyone but its own origin (the live delays come from the
+same origin, `data/delays.json`, every two minutes while the page is visible, and are not stored). It keeps in your browser
+only the timetable and your last inputs. The position that Plan B reads stays on the device. The CDN that serves the files
 keeps access logs: date and time, edge location, path, status, bytes, referrer, User-Agent and the country CloudFront
 derives, and never an IP address, cookie or query string. Raw logs are deleted after 30 days; what is kept are counts
 (page views, countries, bots by name). The setup is public in
