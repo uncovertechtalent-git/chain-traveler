@@ -18,5 +18,7 @@ rm -rf "$WORK/feed" "$WORK/build" && mkdir "$WORK/feed" "$WORK/build"
 unzip -o -q "$WORK/latest.zip" -d "$WORK/feed"
 grep -i '^last-modified:' "$WORK/headers.txt" | tail -n 1 | tr -d '\r' || true
 python3 -I "$HERE/../build/build_timetable.py" "$WORK/feed" "$WORK/build"
-python3 -I "$HERE/../build/manifest.py" make "$WORK/build" "$SITE" > /dev/null
+# The build is named by the date of the feed (its Last-Modified, UTC), not by the day it was built; no header: the build day.
+FEED_DATE="$(python3 -I "$HERE/../build/manifest.py" feed-date "$WORK/headers.txt")"
+python3 -I "$HERE/../build/manifest.py" make "$WORK/build" "$SITE" ${FEED_DATE:+--date "$FEED_DATE"} > /dev/null
 echo "published layout in $SITE/data: $(python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1])); print(m["date"], m["bytes"], "bytes")' "$SITE/data/latest.json")"

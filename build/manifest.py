@@ -11,9 +11,12 @@ download before use:
 
 Usage:
   manifest.py make <built-dir> <out-dir> [--date YYYY-MM-DD]   write <out-dir>/data/<date>/ and <out-dir>/data/latest.json
+  manifest.py feed-date <headers.txt>                          print the UTC date of the feed's Last-Modified header (nothing if there is none)
   manifest.py check <build-dir> <latest.json>                  verify a build directory against a manifest
   manifest.py prune <keep> <date> [<date> ...]                 print the dates to delete, oldest first, keeping the newest <keep>
 """
+import datetime
+import email.utils
 import hashlib
 import json
 import os
@@ -105,6 +108,26 @@ def prune(dates, keep):
     return valid[:-keep] if len(valid) > keep else []
 
 
+def feed_date(headers_text):
+    """The UTC date (YYYY-MM-DD) of the last Last-Modified header in `headers_text`, or None.
+
+    A build is named by the date of the feed it was built from, not by the day it was built: gtfs.de regenerates the
+    feed around 09:40 UTC, so two different feeds can be built on one calendar day and must not share a dated path.
+    With redirects curl writes one header block per response; the last one is the file's own."""
+    found = None
+    for line in headers_text.splitlines():
+        name, _, value = line.partition(':')
+        if name.strip().lower() == 'last-modified':
+            try:
+                dt = email.utils.parsedate_to_datetime(value.strip())
+            except (TypeError, ValueError):
+                continue
+            if dt.tzinfo is None:
+                continue
+            found = dt.astimezone(datetime.timezone.utc).strftime('%Y-%m-%d')
+    return found
+
+
 def write_json(path, obj):
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(obj, f, separators=(',', ':'))
@@ -129,6 +152,15 @@ def cmd_make(args):
     print(json.dumps(m, indent=1))
 
 
+def cmd_feed_date(args):
+    if len(args) != 1:
+        raise SystemExit(__doc__)
+    with open(args[0], encoding='utf-8', errors='replace') as f:
+        d = feed_date(f.read())
+    if d:
+        print(d)
+
+
 def cmd_check(args):
     if len(args) != 2:
         raise SystemExit(__doc__)
@@ -145,10 +177,10 @@ def cmd_prune(args):
 
 
 def main(argv):
-    if len(argv) < 2 or argv[1] not in ('make', 'check', 'prune'):
+    if len(argv) < 2 or argv[1] not in ('make', 'check', 'prune', 'feed-date'):
         raise SystemExit(__doc__)
     try:
-        {'make': cmd_make, 'check': cmd_check, 'prune': cmd_prune}[argv[1]](argv[2:])
+        {'make': cmd_make, 'check': cmd_check, 'prune': cmd_prune, 'feed-date': cmd_feed_date}[argv[1]](argv[2:])
     except (ValueError, KeyError, OSError) as e:
         print('error: %s' % e, file=sys.stderr)
         return 1
