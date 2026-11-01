@@ -2,13 +2,14 @@ import { Timetable, fmt, INF } from './engine.js';
 import { t, th, raw, dur, minutes, num, dayLabel, errText, setLang, initialLang, onLang, applyStatic, LANGS, lang } from './i18n.js';
 import { DataStore, gunzip, describeAge } from './data-store.js';
 import { initLive } from './live.js';
+import { initNavigate } from './navigate.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const toMin = v => { const [h, m] = (v || '06:00').split(':').map(Number); return h * 60 + m; };
 
 const DEFAULTS = { date: '', src: '', dst: '', via: '', t0: '06:00', stay: 180, tr: 4 };
-let tt, state, store, manifest, uiReady = false, lastCheck = 0, lastPlan = null, reachCache = null, live = null;
+let tt, state, store, manifest, uiReady = false, lastCheck = 0, lastPlan = null, reachCache = null, live = null, nav = null;
 
 function loadState() {
   try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('ct-state') || '{}') }; } catch { return { ...DEFAULTS }; }
@@ -94,7 +95,7 @@ function renderChain(res, q) {
   const arrDay = Math.floor(last.arr / 1440) > day0 ? ` (${dayName(q.day, last.arr)})` : '';
   h += `<div class="sum"><div><b>${th('chain.timeRange', { dep: hm(first.dep), arr: hm(last.arr) })}${esc(arrDay)}</b><br><span>${th('leg.fromTo', { from: tt.names[q.src], to: tt.names[q.dst] })}</span></div>
     <div><b>${esc(dur(last.arr - first.dep))}</b><br><span>${th('chain.onTheWay')}</span></div>
-    <div><b>${changes}</b><br><span>${th(res.stays.length ? 'chain.changesStop' : 'chain.changes', { n: changes })}</span></div></div><ol class="chain">`;
+    <div><b>${changes}</b><br><span>${th(res.stays.length ? 'chain.changesStop' : 'chain.changes', { n: changes })}</span></div></div><p class="navstart"><button type="button" data-follow>${th('nav.follow')}</button></p><ol class="chain">`;
   let curDay = day0;
   if (day0 > 0) h += `<li class="wait">${esc(dayName(q.day, first.dep))}</li>`;
   legs.forEach((l, i) => {
@@ -261,6 +262,7 @@ function adopt(cur, next) {
   if (!uiReady) initUi();
   pSrc.set(tt.find(keep.src)); pDst.set(tt.find(keep.dst)); pVia.set(keep.via ? tt.find(keep.via) : -1); pDep.set(keep.dep ? tt.find(keep.dep) : -1);
   live.onTimetable();
+  nav.resume();
   renderFoot();
   $('#status').hidden = true;
   $('#retry').hidden = true;
@@ -304,7 +306,9 @@ function initUi() {
   pDst = picker($('#dst'), () => runPlan());
   pVia = picker($('#via'), () => runPlan());
   pDep = picker($('#dstation'), () => drawDeps());
-  live = initLive({ $, esc, picker, getTt: () => tt, hm, toMin, today: berlinToday, fillDateSelect, minTransfer: () => Math.max(0, +$('#tr').value || 0) });
+  const minTransfer = () => Math.max(0, +$('#tr').value || 0);
+  live = initLive({ $, esc, picker, getTt: () => tt, hm, toMin, today: berlinToday, fillDateSelect, minTransfer, onFollow: o => nav.start(o) });
+  nav = initNavigate({ $, getTt: () => tt, hm, toMin, today: berlinToday, minTransfer, onWays: a => { showTab('live'); live.fromState(a); } });
   $('#t0').value = state.t0; $('#stay').value = state.stay; $('#tr').value = state.tr;
   $('#dtime').value = state.t0;
 
@@ -318,8 +322,15 @@ function initUi() {
   $('#tab-deps').onclick = () => showTab('deps');
   $('#tab-live').onclick = () => showTab('live');
   $('#pane-chain').addEventListener('click', ev => {
+    if (!lastPlan || !lastPlan.res.legs) return;
+    if (ev.target.closest('button[data-follow]')) {
+      const legs = lastPlan.res.legs;
+      nav.start({ day: lastPlan.q.day, legs, dst: lastPlan.q.dst, plannedArr: legs[legs.length - 1].arr });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     const b = ev.target.closest('button.out');
-    if (!b || !lastPlan || !lastPlan.res.legs) return;
+    if (!b) return;
     showTab('live');
     live.fromChain(lastPlan, +b.dataset.leg);
   });
@@ -362,6 +373,7 @@ function refreshLanguage() {
   if (!tt || !uiReady) return;
   fillDates(tt.dateOf(+$('#date').value));
   live.refresh();
+  nav.refresh();
   renderFoot();
   if (manifest) showAge(lastAge.note, lastAge.params);
   runPlan();

@@ -90,6 +90,33 @@ trains from here go. It uses the same positions as the ways, only what falls ins
 stay on top. It costs one more scan of the timetable (about 80 ms on a laptop), so the ways are drawn first and the
 network follows a moment later; it is kept for a redraw with the same inputs.
 
+## Navigate
+
+Press "Follow this chain" on a chain, or "Follow this way" on a way in Plan B, and a card stays at the top of every tab: what
+to do now ("Next: RE6 from Wolfsburg Hbf to Magdeburg Hbf, leaves 06:23, in 13 min", "On the RE6: get off at Magdeburg Hbf at
+07:28", "At Magdeburg Hbf: RE30 leaves 07:35, in 5 min"), what comes then, and the arrival against the plan you started
+with. This is GPS on the trains the Deutschlandticket allows, and like a GPS it recalculates by itself when you leave the
+route. On a train network "leaving the route" means two things:
+
+- **You missed the train.** Either you say so ("I missed it"), or, if you allow position tracking, you are still within 600 m of
+  its station two minutes after it left. Without a position the app assumes you are on board, as a GPS assumes you are on the
+  road, and "I'm on board" only settles the doubt.
+- **You are not where the plan needs you.** With tracking on, you are more than a kilometre from the station you should board
+  at and the train leaves within 20 minutes: the app plans from the nearest station with trains, from where you are now.
+
+A recalculation is the Plan B search from the station and the minute you are at: the missed train is out for good, the ways
+are set against the arrival you first planned, the best one becomes the new chain, and the card says what it did and what it
+cost ("Recalculated: you did not get the RE6 of 06:23. New arrival 10:30, 1 h 00 min later than planned"). "Other ways (Plan B)"
+opens all of them, from the same station and minute, and any of them can be followed instead.
+
+What it keeps and what it sends: the chain you follow is kept on the device (by station names and times, so a new timetable
+does not break it) until you press Stop. Position tracking is a button, not a default; the position is used on the device to
+find the nearest station and is never stored or sent. A "Test the clock" box lets you walk through a chain on any day.
+
+What it does not know: delays and cancellations (the timetable has planned times only), so "missed" comes from you or from your
+position. A phone that sleeps stops the app's clock; it catches up the moment the page is visible again. Tracking uses the
+device's positioning, which uses battery; stop it when you do not need it.
+
 ## Languages
 
 English, Polski, Русский, Română, Български, Українська, Türkçe, Nederlands, Français and Español. The language is the
@@ -177,7 +204,7 @@ next step if the threat model ever needs it.
 
 | Suite | Runs | Covers |
 |---|---|---|
-| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search, the stations nearest to a position. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG; the network around a journey on a small star network (`context.test.mjs`): the earliest-arrival tree, walks, the time cut, runs marked out, and how the SVG draws it. Deterministic, no network. The languages (`i18n.test.mjs`): same keys, placeholders and plural forms in every locale, no markup, and every key used. |
+| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search, the stations nearest to a position. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Navigate on the corridor timetable (`navigate.test.mjs`): where you are in a chain at each minute, missed by word or by position, not at the station, recalculation with the missed run kept out, and what is stored between launches. Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG; the network around a journey on a small star network (`context.test.mjs`): the earliest-arrival tree, walks, the time cut, runs marked out, and how the SVG draws it. Deterministic, no network. The languages (`i18n.test.mjs`): same keys, placeholders and plural forms in every locale, no markup, and every key used. |
 | `test/build/` | on every pull request (Python `unittest`) | The manifest and its checks (changed byte, truncated or missing file, malformed fields), retention of three builds, and `scripts/ci/deploy-shell.sh` and `publish-data.sh` against a fake AWS CLI: the shell deploy never writes under `data/`, the publish never writes outside it, the pointer is written last, a same-day build with other bytes is refused, a damaged upload leaves the old pointer. |
 | `test/feed/` | before a timetable build is published, and locally after `scripts/fetch-feed.sh` | The engine on the real national timetable: size and age of the window, named chains (Wolfsburg to Leipzig and München, München to Wolfsburg via Nürnberg, Wolfsburg to München via Leipzig), the Leipzig footpath, a train past midnight, station search, and Plan B with the planned first train out (ordered ways, none of them the cancelled run, well under a second). Days come from the data, bounds are generous ceilings. |
 
