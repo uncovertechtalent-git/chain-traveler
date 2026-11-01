@@ -108,5 +108,5 @@ jobs:
           AWS_REGION: eu-central-1
         run: |
           . scripts/ci/aws-session.sh
-          aws_session "$AWS_ROLE_ARN" chain-traveler-delays 900
+          aws_session "$AWS_ROLE_ARN" chain-traveler-data 900
           scripts/ci/publish-delays.sh publish dist-delays "$SITE_BUCKET"
