@@ -55,7 +55,7 @@ function timeOf(n, t0) {
   return fmt(n.arr);
 }
 
-export function svgOf(model, { width = WIDTH, height = HEIGHT, label = 'Ways on' } = {}) {
+export function svgOf(model, { width = WIDTH, height = HEIGHT, label = 'Ways on', min = 'min' } = {}) {
   const pos = project(model.nodes, { width, height, padX: width < 500 ? 70 : 96 });
   const at = new Map(model.nodes.map((n, i) => [n.st, pos[i]]));
   const edges = [...model.edges].sort((a, b) => ORDER[a.kind === 'ghost' ? 'ghost' : a.band] - ORDER[b.kind === 'ghost' ? 'ghost' : b.band]);
@@ -75,7 +75,7 @@ export function svgOf(model, { width = WIDTH, height = HEIGHT, label = 'Ways on'
   const order = [...model.nodes.keys()].sort((i, j) => (model.nodes[j].src || model.nodes[j].dst ? 1 : 0) - (model.nodes[i].src || model.nodes[i].dst ? 1 : 0));
   const items = order.map(i => {
     const n = model.nodes[i], p = at.get(n.st);
-    const tm = timeOf(n, model.t0) + (n.dst && n.delta > 0 ? ' +' + n.delta + ' min' : '');
+    const tm = timeOf(n, model.t0) + (n.dst && n.delta > 0 ? ' +' + n.delta + ' ' + min : '');
     return { n, x: p.x, y: p.y, nm: short(n.name), tm, w: Math.max(short(n.name).length * 7.2, tm.length * 6.6) + 4, h: 30 };
   });
   placeLabels(items, width).forEach((r, k) => {

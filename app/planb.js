@@ -50,22 +50,22 @@ function describe(tt, o, { day, exclude }) {
 // Names for what sets a way apart, only where it does tell the ways apart.
 function tag(options) {
   options.forEach(o => { o.tags = []; });
-  options[0].tags.push('Earliest arrival');
+  options[0].tags.push('earliest');
   if (options.length < 2) return;
   const fewest = Math.min(...options.map(o => o.changes));
   const fewList = options.filter(o => o.changes === fewest);
-  if (fewList.length < options.length) fewList.forEach(o => o.tags.push('Fewest changes'));
+  if (fewList.length < options.length) fewList.forEach(o => o.tags.push('fewest'));
   const most = Math.max(...options.map(o => o.thinnest));
   const robust = options.filter(o => o.thinnest === most);
-  if (robust.length < options.length) robust.forEach(o => o.tags.push('Most trains an hour'));
+  if (robust.length < options.length) robust.forEach(o => o.tags.push('robust'));
 }
 
 // The ways on, against the plan. plannedArr is the arrival the plan promised (minutes after midnight of `day`); without
 // it the best way on is the yardstick.
 export function plan(tt, { day, src, dst, t0, plannedArr = null, exclude = null, minTransfer = 4, window = 180, max = 4 }) {
-  if (src === dst) return { options: [], error: 'You are already at the target.' };
+  if (src === dst) return { options: [], error: 'You are already at the target.', code: 'alreadyThere' };
   const found = ways(tt, { day, src, dst, t0, exclude, minTransfer, window, max });
-  if (!found.length) return { options: [], error: 'No way on to the target from here after that time.' };
+  if (!found.length) return { options: [], error: 'No way on to the target from here after that time.', code: 'noWay' };
   const base = plannedArr !== null ? plannedArr : found[0].arr;
   const options = found.map(o => {
     const d = describe(tt, o, { day, exclude });

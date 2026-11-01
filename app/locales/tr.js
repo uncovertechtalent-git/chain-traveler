@@ -1,0 +1,162 @@
+// Türkçe. The keys, placeholders and plural forms of en.js (tr: one, other).
+// A noun after a number stays singular in Turkish, so both plural forms are the same text.
+// Station names are never declined: no suffix is attached to {station}, {from}, {to}, {term}, {stop}.
+export default {
+  // ---- header, status, language
+  'lang.label': 'Dil',
+  'meta.sub': 'Deutschlandticket ile herhangi iki Alman istasyonu arasında sıradaki bölgesel trenleri zincirleyin; dilediğiniz yerde mola verin. Planlanan saatler, bu cihazdaki sefer saatlerinden çevrimdışı okunur.',
+  'status.loading': 'Sefer saatleri yükleniyor...',
+  'status.first': 'Sefer saatleri ilk kez yükleniyor (yaklaşık 5 MB)...',
+  'status.loadFailed': 'Sefer saatleri yüklenemedi ({message}). İlk açılış için internet bağlantısı gerekir.',
+  'status.noCache': 'Bu tarayıcı sefer saatlerini cihazda saklayamıyor (HTTPS üzerinden Cache Storage gerekir). Güncel bir tarayıcı deneyin.',
+  'status.readFailed': 'Kayıtlı sefer saatleri okunamadı: {message}',
+  'btn.retry': 'Tekrar dene',
+
+  // ---- age of the timetable
+  'age.expired': 'Sefer saatlerinin geçerlilik süresi {last} tarihinde doldu. Bu tarihten sonraki trenler yok; güncellemek için internete bağlanın.',
+  'age.soon': '{date} tarihli sefer saatleri, {last} tarihine kadar geçerli ({left}). Çevrimiçi olduğunuzda kendiliğinden güncellenir.',
+  'age.lastDay': 'son gün',
+  'age.moreDays': { one: '{n} gün daha', other: '{n} gün daha' },
+  'age.ok': '{date} tarihli sefer saatleri, {last} tarihine kadar geçerli.',
+  'age.offline': 'Çevrimdışı: bu cihazdaki sefer saatleri kullanılıyor.',
+  'age.updated': 'Az önce güncellendi.',
+  'age.upToDate': 'Güncel.',
+  'age.checkFailed': 'Daha yeni sefer saatleri kontrol edilemedi ({code}); cihazdaki veriler değişmedi.',
+
+  // ---- the trip form
+  'aria.trip': 'Yolculuk',
+  'field.station': 'İstasyon',
+  'field.start': 'Başlangıç',
+  'field.date': 'Tarih',
+  'field.leaveAfter': 'En erken kalkış',
+  'field.target': 'Hedef',
+  'field.via': 'Mola (isteğe bağlı)',
+  'field.stay': 'En az mola süresi (dk)',
+  'field.change': 'En az aktarma süresi (dk)',
+  'btn.plan': 'Zinciri planla',
+  'btn.swap': 'Başlangıç ve hedefi değiştir',
+  'btn.clearvia': 'Mola yok',
+
+  // ---- tabs
+  'tab.chain': 'Zincir',
+  'tab.reach': 'Erişim haritası',
+  'tab.deps': 'Kalkışlar',
+  'tab.live': 'Plan B',
+
+  // ---- chain
+  'chain.intro': 'Aralarındaki sıradaki bölgesel trenleri zincirlemek için bir başlangıç ve bir hedef istasyonu seçin.',
+  'chain.pickBoth': 'Önerilerden bir başlangıç ve bir hedef istasyonu seçin.',
+  'chain.noTrainToday': '{from} çıkışlı uygun tren yok: {day}, {time} sonrası. İlk zincir şu tarihte kalkıyor: {first}.',
+  'chain.timeRange': '{dep} – {arr}',
+  'leg.fromTo': '{from} – {to}',
+  'chain.onTheWay': 'yolda',
+  'chain.changes': { one: 'aktarma', other: 'aktarma' },
+  'chain.changesStop': { one: 'aktarma ve mola', other: 'aktarma ve mola' },
+  'chain.stay': '{station} molası: varış {arr}, kalkış {dep} ({dur})',
+  'chain.wait': '{station}: {min}',
+  'chain.waitTight': '{station}: {min} (kısa aktarma)',
+  'chain.walk': 'Yürüyüş: {from} – {to}',
+  'leg.towards': '{term} yönü, {dur}',
+  'btn.out': 'Bu tren iptal mi?',
+  'chain.nextTrains': 'Her durakta sonraki trenler',
+  'chain.arrive': '(varış {time})',
+  'dep.towards': '{term} yönü',
+  'dep.nextStop': 'sonraki durak: {stop}',
+
+  // ---- reach map
+  'reach.within': 'Yola çıktıktan sonra {hours} saat içinde ulaşılan istasyonları göster',
+  'reach.sooner': 'daha erken',
+  'reach.later': 'daha geç',
+  'reach.note': 'Her nokta, bölgesel trenle ulaşılabilen bir istasyondur. Renk, başlangıç istasyonundan oraya ne kadar çabuk varabileceğinizi gösterir. Oraya zincir planlamak için bir noktaya tıklayın.',
+
+  // ---- departures
+  'field.after': 'Şu saatten sonra',
+  'deps.pick': 'Bir istasyon seçin.',
+  'deps.none': 'Bu saatten sonra kalkış yok.',
+  'deps.th.departs': 'Kalkış',
+  'deps.th.line': 'Hat',
+  'deps.th.towards': 'Yön',
+  'deps.th.next': 'Sonraki durak',
+
+  // ---- Plan B
+  'live.intro': 'Treniniz iptal mi? Nerede olduğunuzu ve nereye gittiğinizi belirtin. Buradan devam etme seçeneklerini, planınızla karşılaştırmalı olarak ve her bölümde saatte kaç tren olduğuyla birlikte görürsünüz.',
+  'field.iAmAt': 'Bulunduğum yer',
+  'field.timeNow': 'Şu anki saat',
+  'field.goingTo': 'Gideceğim yer',
+  'field.plannedArr': 'Planlanan varış (isteğe bağlı)',
+  'btn.locate': 'Konumumu kullan',
+  'live.say': 'Nerede olduğunuzu ve nereye gittiğinizi belirtin.',
+  'live.depsTitle': '{station} çıkışlı trenler, {time} sonrası',
+  'live.noMoreToday': 'Sefer saatlerine göre bu tarihte {time} sonrası {station} çıkışlı tren yok. Aşağıdakiler ertesi güne ait (+1).',
+  'live.tick': 'İptal olanları işaretleyin.',
+  'live.unlisted': { one: 'Daha önce iptal olarak işaretlenen {n} tren daha bu listede yok.', other: 'Daha önce iptal olarak işaretlenen {n} tren daha bu listede yok.' },
+  'live.leadPlan': 'Planlanan varışınız {plan} idi. Şimdi en iyi devam seçeneğiyle varış saati {best}{later}.',
+  'live.later': ', {dur} daha geç',
+  'live.leadBest': 'Planlanan varış verilmedi; ölçüt en iyi devam seçeneğidir (varış {best}).',
+  'graph.label': '{from} – {to} arası devam seçenekleri',
+
+  // ---- Plan B: how a way compares
+  'chip.best': 'en iyi seçenek',
+  'chip.best.good': 'en iyiye yakın, +{dur}',
+  'chip.best.mid': 'daha geç, +{dur}',
+  'chip.best.bad': 'çok daha geç, +{dur}',
+  'chip.plan.early': 'plana uygun, {dur} erken',
+  'chip.plan.exact': 'plana uygun',
+  'chip.plan.good': 'plana uygun, +{dur}',
+  'chip.plan.mid': 'geç, +{dur}',
+  'chip.plan.bad': 'çok daha geç, +{dur}',
+  'tag.earliest': 'En erken varış',
+  'tag.fewest': 'En az aktarma',
+  'tag.robust': 'Saatte en çok tren',
+  'opt.arrive': 'varış',
+  'opt.leave': 'kalkış {time}',
+  'opt.changes': { one: '{n} aktarma', other: '{n} aktarma' },
+  'opt.tightest': 'en kısa aktarma {min}',
+  'opt.thinnest': { one: 'en seyrek bölüm: saatte {n} tren', other: 'en seyrek bölüm: saatte {n} tren' },
+
+  // ---- Plan B: legend. green, amber and red are the colours of the chips and lines
+  'legend.green': 'yeşil',
+  'legend.amber': 'turuncu',
+  'legend.red': 'kırmızı',
+  'legend.basePlan': 'planınıza göre',
+  'legend.baseBest': 'en iyi seçeneğe göre',
+  'legend.good': '{base} en fazla {n} dk geç',
+  'legend.mid': 'en fazla {n} dk',
+  'legend.bad': 'bundan fazla.',
+  'legend.thick': 'Çizgi kalınlığı: o bölümde saatte kaç tren olduğunu gösterir; bir (ince) ile dört veya daha fazla (kalın) arasında değişir.',
+  'legend.dotted': 'Noktalı çizgi: sahip olduğunuz plan.',
+
+  // ---- Plan B: where you are
+  'loc.looking': 'Konumunuz aranıyor...',
+  'loc.unsupported': 'Bu tarayıcı nerede olduğunuzu belirleyemiyor. İstasyonu adıyla seçin.',
+  'loc.denied': 'Bu sayfa için konum izni verilmemiş. Tarayıcı ayarlarından bu site için izin verin veya istasyonu adıyla seçin.',
+  'loc.unavailable': 'Cihaz nerede olduğunuzu belirleyemedi. İstasyonu adıyla seçin.',
+  'loc.timeout': 'Konumunuzun bulunması çok uzun sürdü. Tekrar deneyin veya istasyonu adıyla seçin.',
+  'loc.none': 'Çevrenizde 40 km içinde bölgesel tren olan istasyon yok. İstasyonu adıyla seçin.',
+  'loc.near': 'Yakınınızdaki istasyon: {station} ({dist}). Tarih ve saat şimdiye ayarlandı.',
+  'loc.rough': 'Konum yalnızca yaklaşık {km} km doğrulukta, bu yüzden istasyonu kontrol edin.',
+  'loc.private': 'Konumunuz bu cihazda kalır.',
+  'loc.notHere': 'Burada değil misiniz?',
+
+  // ---- search errors
+  'err.sameStation': 'Başlangıç ve hedef aynı istasyon.',
+  'err.viaUnreachable': 'Mola istasyonuna başlangıç saatinden sonra ulaşılamıyor.',
+  'err.noOnward': 'Moladan sonra devam eden bağlantı yok; daha kısa bir mola veya daha erken bir kalkış deneyin.',
+  'err.noConnection': 'O gün başlangıç saatinden sonra bağlantı yok.',
+  'err.alreadyThere': 'Zaten hedefinizdesiniz.',
+  'err.noWay': 'Buradan, bu saatten sonra hedefe devam edecek bir yol yok.',
+
+  // ---- footer
+  'foot': 'Sefer saatleri: {publisher}, {license}. {stations} istasyon, {connections} bağlantı, {first} – {last}. Yalnızca planlanan saatler; gecikmeler ve yol çalışmaları yok. Yola çıkmadan önce yolculuğu DB Navigator uygulamasında kontrol edin.',
+
+  // ---- units. {n} is a number
+  'unit.h': 'sa',
+  'unit.min': 'dk',
+  'unit.m': '{n} m',
+  'unit.km': '{n} km',
+  'unit.perHour': '{n}/sa',
+
+  // ---- the page for an address that does not exist
+  'nf.title': 'Sayfa bulunamadı',
+  'nf.body': 'Bu adreste sayfa yok. {app}, Deutschlandticket ile çevrimdışı çalışarak bölgesel tren zincirleri planlar.',
+};
