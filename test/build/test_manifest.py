@@ -128,5 +128,53 @@ class ManifestTest(unittest.TestCase):
         self.assertIn('error:', r.stderr)
 
 
+class FeedDateTest(unittest.TestCase):
+    """A build is named by the date of its feed, not by the day it was built."""
+
+    BLOCK = 'HTTP/2 200 \r\ncontent-type: application/zip\r\nlast-modified: Sat, 31 Oct 2026 09:38:32 GMT\r\n\r\n'
+
+    def test_the_utc_date_of_last_modified(self):
+        self.assertEqual(manifest.feed_date(self.BLOCK), '2026-10-31')
+
+    def test_another_time_zone_is_read_in_utc(self):
+        self.assertEqual(manifest.feed_date('Last-Modified: Sat, 31 Oct 2026 23:30:00 -0500\n'), '2026-11-01')
+        self.assertEqual(manifest.feed_date('Last-Modified: Sun, 01 Nov 2026 00:30:00 +0200\n'), '2026-10-31')
+
+    def test_after_a_redirect_the_last_response_counts(self):
+        redirect = 'HTTP/2 302 \r\nlast-modified: Mon, 26 Oct 2026 08:00:00 GMT\r\n\r\n'
+        self.assertEqual(manifest.feed_date(redirect + self.BLOCK), '2026-10-31')
+
+    def test_no_usable_header_gives_nothing(self):
+        for text in ('', 'HTTP/2 200 \r\ncontent-length: 5\r\n', 'Last-Modified: yesterday\n', 'Last-Modified: 2026-10-31\n'):
+            self.assertIsNone(manifest.feed_date(text), repr(text))
+
+    def test_two_feeds_built_on_one_day_get_two_paths(self):
+        # The 2026-11-01 incident: the Oct 31 feed was published on Nov 1, then gtfs.de regenerated, and the
+        # build day named both builds data/2026-11-01/.
+        old = manifest.feed_date('Last-Modified: Sat, 31 Oct 2026 09:38:32 GMT\n')
+        new = manifest.feed_date('Last-Modified: Sun, 01 Nov 2026 09:41:07 GMT\n')
+        self.assertNotEqual(old, new)
+
+    def test_cli_prints_the_date_or_nothing(self):
+        tool = os.path.join(ROOT, 'build', 'manifest.py')
+        with tempfile.TemporaryDirectory() as d:
+            hdr = os.path.join(d, 'headers.txt')
+            with open(hdr, 'w', encoding='utf-8') as f:
+                f.write(self.BLOCK)
+            r = subprocess.run([sys.executable, '-I', tool, 'feed-date', hdr], capture_output=True, text=True)
+            self.assertEqual((r.returncode, r.stdout.strip()), (0, '2026-10-31'))
+            with open(hdr, 'w', encoding='utf-8') as f:
+                f.write('HTTP/2 200 \r\n')
+            r = subprocess.run([sys.executable, '-I', tool, 'feed-date', hdr], capture_output=True, text=True)
+            self.assertEqual((r.returncode, r.stdout.strip()), (0, ''))
+
+    def test_fetch_feed_names_the_build_by_the_feed_date(self):
+        # fetch-feed.sh downloads the real feed, so it is not run here; this guards the wiring.
+        with open(os.path.join(ROOT, 'scripts', 'fetch-feed.sh'), encoding='utf-8') as f:
+            script = f.read()
+        self.assertIn('manifest.py" feed-date "$WORK/headers.txt"', script)
+        self.assertIn('--date "$FEED_DATE"', script)
+
+
 if __name__ == '__main__':
     unittest.main()
