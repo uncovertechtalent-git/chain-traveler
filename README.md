@@ -330,8 +330,10 @@ The app has no account, no analytics script and no request to anyone but its own
 the timetable and your last inputs. The position that Plan B reads stays on the device. The CDN that serves the files
 keeps access logs: date and time, edge location, path, status, bytes, referrer, User-Agent and the country CloudFront
 derives, and never an IP address, cookie or query string. Raw logs are deleted after 30 days; what is kept are counts
-(page views, countries, bots by name). The setup is public in
-[site-infra](https://github.com/uncovertechtalent-git/site-infra).
+(page views, countries, bots by name), and they are public: the
+[Chain Traveler traffic dashboard](https://grafana.scoetzee.de/public-dashboards/33fe3e497b5f42d7a21524f5af27cb66)
+shows opens, timetable checks and downloads, countries and bots, and says what the numbers are and are not. The setup
+is public in [site-infra](https://github.com/uncovertechtalent-git/site-infra).
 
 ## Security
 
