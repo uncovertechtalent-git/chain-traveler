@@ -3,7 +3,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Limbă',
-  'meta.sub': 'Legați în lanț următoarele trenuri regionale dintre oricare două gări germane cu Deutschlandticket, cu o oprire oriunde doriți. Ore planificate, citite offline din orarul de pe acest dispozitiv.',
+  'meta.sub': 'Planul B pentru Deutschlandticket: când trenul regional este anulat, vedeți toate variantele de continuare de acolo unde vă aflați. Sau legați în lanț trenuri între oricare două gări germane. Ore planificate, citite offline din orarul de pe acest dispozitiv.',
   'status.loading': 'Se încarcă orarul...',
   'status.first': 'Se încarcă orarul pentru prima dată (aproximativ 5 MB)...',
   'status.loadFailed': 'Orarul nu a putut fi încărcat ({message}). Prima pornire necesită o conexiune la internet.',
@@ -25,10 +25,9 @@ export default {
   // ---- the trip form
   'aria.trip': 'Călătorie',
   'field.station': 'Gară',
-  'field.start': 'Gara de plecare',
   'field.date': 'Data',
-  'field.leaveAfter': 'Plecare după',
-  'field.target': 'Gara de destinație',
+  'field.time': 'Ora',
+  'field.now': 'Acum',
   'field.via': 'Oprire (opțional)',
   'field.stay': 'Oprire minimă (min)',
   'field.change': 'Schimbare minimă (min)',
@@ -69,8 +68,7 @@ export default {
   'reach.note': 'Fiecare punct este o gară la care se poate ajunge cu trenul regional. Culoarea arată cât de repede puteți ajunge acolo din gara de plecare. Apăsați pe un punct pentru a crea un lanț până acolo.',
 
   // ---- departures
-  'field.after': 'După',
-  'deps.pick': 'Alegeți o gară.',
+  'deps.pick': 'Alege stația de mai sus ca să vezi plecările ei.',
   'deps.none': 'Nu există plecări după acea oră.',
   'deps.th.departs': 'Pleacă',
   'deps.th.line': 'Linie',
@@ -80,7 +78,6 @@ export default {
   // ---- Plan B
   'live.intro': 'Trenul dvs. este anulat? Spuneți unde vă aflați și încotro mergeți. Primiți variantele de continuare de aici, fiecare raportată la planul dvs., și câte trenuri pe oră circulă pe fiecare tronson.',
   'field.iAmAt': 'Mă aflu la',
-  'field.timeNow': 'Ora acum',
   'field.goingTo': 'Merg spre',
   'field.plannedArr': 'Sosire planificată (opțional)',
   'btn.locate': 'Folosiți locația mea',

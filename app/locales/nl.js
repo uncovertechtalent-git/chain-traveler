@@ -2,7 +2,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Taal',
-  'meta.sub': 'Schakel de eerstvolgende regionale treinen tussen twee Duitse stations aan elkaar met het Deutschlandticket, met een tussenstop waar je maar wilt. Geplande tijden, offline gelezen uit de dienstregeling op dit apparaat.',
+  'meta.sub': 'Plan B voor het Deutschlandticket: valt je regionale trein uit, bekijk dan alle opties om vanaf waar je bent verder te komen. Of schakel treinen tussen twee Duitse stations aan elkaar. Geplande tijden, offline gelezen uit de dienstregeling op dit apparaat.',
   'status.loading': 'Dienstregeling laden...',
   'status.first': 'Dienstregeling voor het eerst laden (ca. 5 MB)...',
   'status.loadFailed': 'De dienstregeling kon niet worden geladen ({message}). De eerste keer is een internetverbinding nodig.',
@@ -24,10 +24,9 @@ export default {
   // ---- the trip form
   'aria.trip': 'Reis',
   'field.station': 'Station',
-  'field.start': 'Van',
   'field.date': 'Datum',
-  'field.leaveAfter': 'Vertrek vanaf',
-  'field.target': 'Naar',
+  'field.time': 'Tijd',
+  'field.now': 'Nu',
   'field.via': 'Tussenstop (optioneel)',
   'field.stay': 'Minimaal verblijf (min)',
   'field.change': 'Minimale overstaptijd (min)',
@@ -68,8 +67,7 @@ export default {
   'reach.note': 'Elke stip is een station dat je met regionale treinen kunt bereiken. De kleur toont hoe snel je er vanaf het vertrekstation kunt zijn. Klik op een stip om er een keten naartoe te plannen.',
 
   // ---- departures
-  'field.after': 'Vanaf',
-  'deps.pick': 'Kies een station.',
+  'deps.pick': 'Kies hierboven een station om de vertrektijden te zien.',
   'deps.none': 'Geen treinen na dat tijdstip.',
   'deps.th.departs': 'Vertrek',
   'deps.th.line': 'Lijn',
@@ -79,7 +77,6 @@ export default {
   // ---- Plan B
   'live.intro': 'Valt je trein uit? Geef aan waar je bent en waar je heen gaat. Je krijgt de opties om verder te komen, elk afgezet tegen je plan, en hoeveel treinen per uur er op elk traject rijden.',
   'field.iAmAt': 'Ik ben bij',
-  'field.timeNow': 'Tijd nu',
   'field.goingTo': 'Ik ga naar',
   'field.plannedArr': 'Geplande aankomst (optioneel)',
   'btn.locate': 'Gebruik mijn locatie',

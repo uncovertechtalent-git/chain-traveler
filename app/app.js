@@ -4,6 +4,7 @@ import { DataStore, gunzip, describeAge } from './data-store.js';
 import { MANIFEST_KEYS } from './keys.js';
 import { initLive } from './live.js';
 import { initNavigate } from './navigate.js';
+import { berlinClock, tick as clockStep, atLaunch, onReturn, migrate } from './here.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -11,9 +12,13 @@ const toMin = v => { const [h, m] = (v || '06:00').split(':').map(Number); retur
 
 const DEFAULTS = { date: '', src: '', dst: '', via: '', t0: '06:00', stay: 180, tr: 4 };
 let tt, state, store, manifest, uiReady = false, lastCheck = 0, lastPlan = null, reachCache = null, live = null, nav = null;
+let fromSource = '';      // where "I am at" came from: 'gps' (the device said so), 'manual' (a station was picked) or ''
+let lastLocate = 0;       // when the device was last asked for the position, to keep the silent asks apart
 
 function loadState() {
-  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('ct-state') || '{}') }; } catch { return { ...DEFAULTS }; }
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem('ct-state') || 'null'); } catch { raw = null; }
+  return migrate(raw, DEFAULTS);
 }
 function saveState() { try { localStorage.setItem('ct-state', JSON.stringify(state)); } catch { /* storage unavailable */ } }
 
@@ -46,7 +51,7 @@ function picker(input, onPick) {
   };
 }
 
-let pSrc, pDst, pVia, pDep;
+let pSrc, pDst, pVia;
 
 function currentInputs() {
   return {
@@ -58,14 +63,85 @@ function currentInputs() {
 function persist() {
   state.date = tt.dateOf(+$('#date').value);
   state.src = $('#src').value; state.dst = $('#dst').value; state.via = $('#via').value;
-  state.t0 = $('#t0').value; state.stay = +$('#stay').value; state.tr = +$('#tr').value;
+  state.now = $('#nowon').checked; state.from = fromSource;
+  if (!state.now) state.t0 = $('#t0').value;     // a time that follows the clock is not kept: it would be old at the next visit
+  state.stay = +$('#stay').value; state.tr = +$('#tr').value;
   saveState();
+}
+
+// ---- where and when: one bar for every tab ----
+// What the bar says, for the tabs.
+const place = () => ({ src: pSrc.get(), dst: pDst.get(), day: +$('#date').value, t0: toMin($('#t0').value) });
+
+function setDay(iso) {
+  const d = tt.dayIndex(iso);
+  $('#date').value = d >= 0 && d < tt.nDays ? d : (d < 0 ? 0 : tt.nDays - 1);
+}
+function setNow(on) { $('#nowon').checked = on; }
+// The date and the time of the bar follow the clock of Germany.
+function applyClock() {
+  const c = berlinClock();
+  setDay(c.iso);
+  $('#t0').value = c.hm;
+}
+
+// Put a place, a day and a time into the bar, for a way chosen somewhere else (a leg of a chain, Navigate, the position of
+// the device). now: true makes the date and the time follow the clock; a time given by hand turns that off. Nothing is
+// drawn: the caller draws what it wants to show.
+function setPlace({ src, dst, day, time, now, from }) {
+  if (src !== undefined) pSrc.set(src);
+  if (dst !== undefined) pDst.set(dst);
+  if (from !== undefined) fromSource = from;
+  if (now === true) { setNow(true); applyClock(); }
+  else if (now === false) setNow(false);
+  if (day !== undefined) $('#date').value = day;
+  if (time !== undefined) $('#t0').value = time;
+  persist();
+}
+
+// Draw the tab that is shown. The chain is worked out for the reach map as well, which draws it over the dots.
+function renderTab() {
+  if (!tt || !uiReady) return;
+  const shown = ['live', 'chain', 'deps', 'reach'].find(n => !$('#pane-' + n).hidden);
+  if (shown === 'live') live.run();
+  else if (shown === 'chain') runPlan();
+  else if (shown === 'deps') drawDeps();
+  else if (shown === 'reach') { runPlan(); drawReach(); }
+}
+
+// A tick of the clock: when the bar follows it and the minute has moved, the bar moves and the tab is drawn again.
+function clockTick() {
+  if (!tt || !uiReady) return;
+  const next = clockStep({ nowOn: $('#nowon').checked, shown: { iso: tt.dateOf(+$('#date').value), hm: $('#t0').value }, clock: berlinClock() });
+  if (!next) return;
+  applyClock();
+  persist();
+  renderTab();
+}
+
+async function geoGranted() {
+  try { return (await navigator.permissions.query({ name: 'geolocation' })).state === 'granted'; } catch { return false; }
+}
+// The page is open again after a while: the clock catches up and a position from the device is read again, when the
+// device lets that happen without a question.
+async function comeBack() {
+  clockTick();
+  if (!tt || !uiReady || Date.now() - lastLocate < 60000) return;
+  if (onReturn({ source: fromSource, granted: await geoGranted() }) === 'locate') { lastLocate = Date.now(); live.locate(true); }
+}
+// The first build is in. A position from the last visit is old: ask the device again if it lets that happen without a
+// question, drop it if it does not, and leave a station somebody picked.
+async function launchPlace() {
+  const what = atLaunch({ source: state.from, granted: await geoGranted(), hasPlace: pSrc.get() >= 0 });
+  if (what === 'keep') return;
+  pSrc.set(-1); fromSource = ''; persist(); renderTab();
+  if (what === 'locate') { lastLocate = Date.now(); live.locate(true); }
 }
 
 // ---- chain ----
 function runPlan() {
   const q = currentInputs();
-  const out = $('#pane-chain');
+  const out = $('#chainres');
   persist();
   if (q.src < 0 || q.dst < 0) {
     const started = $('#src').value.trim() || $('#dst').value.trim();
@@ -78,9 +154,8 @@ function runPlan() {
   const res = tt.plan({ day: q.day, src: q.src, dst: q.dst, t0: q.t0, via: q.via, stayMin: q.stay, minTransfer: q.tr });
   lastPlan = { res, q };
   reachCache = null;
-  if (res.error) { out.innerHTML = `<div class="err">${esc(errText(res))}</div>`; if (!$('#pane-reach').hidden) drawReach(); return; }
+  if (res.error) { out.innerHTML = `<div class="err">${esc(errText(res))}</div>`; return; }
   out.innerHTML = renderChain(res, q);
-  if (!$('#pane-reach').hidden) drawReach();
 }
 
 const hm = m => fmt(((m % 1440) + 1440) % 1440);
@@ -191,10 +266,10 @@ function nearestPt(ev) {
 
 // ---- departures ----
 function drawDeps() {
-  const s = pDep.get();
+  const s = pSrc.get();
   const out = $('#deplist');
   if (s < 0) { out.innerHTML = `<p class="note">${th('deps.pick')}</p>`; return; }
-  const day = +$('#date').value, t = toMin($('#dtime').value);
+  const day = +$('#date').value, t = toMin($('#t0').value);
   const deps = tt.departures({ day, station: s, t, limit: 14 });
   out.innerHTML = deps.length
     ? `<table><tr><th>${th('deps.th.departs')}</th><th>${th('deps.th.line')}</th><th>${th('deps.th.towards')}</th><th>${th('deps.th.next')}</th></tr>${deps.map(d => `<tr><td class="t">${hm(d.dep)}${d.dep >= 1440 ? ' <span class="mute">' + esc(dayName(day, d.dep)) + '</span>' : ''}</td><td><span class="line">${esc(d.line)}</span></td><td>${esc(tt.names[d.term])}</td><td class="mute">${esc(tt.names[d.next])} ${hm(d.arr)}</td></tr>`).join('')}</table>`
@@ -202,14 +277,12 @@ function drawDeps() {
 }
 
 // ---- tabs ----
-function showTab(name) {
-  for (const t of ['chain', 'reach', 'deps', 'live']) {
+function showTab(name, render = true) {
+  for (const t of ['live', 'chain', 'deps', 'reach']) {
     $('#pane-' + t).hidden = t !== name;
     $('#tab-' + t).setAttribute('aria-selected', t === name ? 'true' : 'false');
   }
-  if (name === 'reach') drawReach();
-  if (name === 'deps') { if (pDep.get() < 0) pDep.set(pSrc.get()); drawDeps(); }
-  if (name === 'live') live.open(pSrc.get(), pDst.get());
+  if (render) renderTab();
 }
 
 // ---- timetable data: load from the device, update in the background ----
@@ -253,15 +326,17 @@ function fillDateSelect(sel, wantedIso) {
 // the picked stations and the day are carried over by name and date.
 function adopt(cur, next) {
   const keep = uiReady
-    ? { iso: tt.dateOf(+$('#date').value), src: $('#src').value, dst: $('#dst').value, via: $('#via').value, dep: $('#dstation').value }
-    : { iso: state.date, src: state.src, dst: state.dst, via: state.via, dep: '' };
+    ? { iso: tt.dateOf(+$('#date').value), src: $('#src').value, dst: $('#dst').value, via: $('#via').value }
+    : { iso: state.date, src: state.src, dst: state.dst, via: state.via };
   tt = next;
   manifest = cur.manifest;
   reachCache = null;
   lastPlan = null;
   fillDates(keep.iso);
-  if (!uiReady) initUi();
-  pSrc.set(tt.find(keep.src)); pDst.set(tt.find(keep.dst)); pVia.set(keep.via ? tt.find(keep.via) : -1); pDep.set(keep.dep ? tt.find(keep.dep) : -1);
+  const first = !uiReady;
+  if (first) initUi();
+  pSrc.set(tt.find(keep.src)); pDst.set(tt.find(keep.dst)); pVia.set(keep.via ? tt.find(keep.via) : -1);
+  if ($('#nowon').checked) applyClock();
   live.onTimetable();
   nav.resume();
   renderFoot();
@@ -269,8 +344,8 @@ function adopt(cur, next) {
   $('#retry').hidden = true;
   $('#app').hidden = false;
   showAge('');
-  runPlan();
-  if (!$('#pane-deps').hidden) drawDeps();
+  renderTab();
+  if (first) launchPlace();
 }
 
 async function useBuild(cur) {
@@ -303,25 +378,30 @@ async function checkForUpdate() {
 
 function initUi() {
   uiReady = true;
-  pSrc = picker($('#src'), () => runPlan());
-  pDst = picker($('#dst'), () => runPlan());
-  pVia = picker($('#via'), () => runPlan());
-  pDep = picker($('#dstation'), () => drawDeps());
+  fromSource = state.from;
+  const changedPlace = () => { live.forget(); persist(); renderTab(); };
+  pSrc = picker($('#src'), () => { fromSource = 'manual'; changedPlace(); });
+  pDst = picker($('#dst'), changedPlace);
+  pVia = picker($('#via'), () => renderTab());
   const minTransfer = () => Math.max(0, +$('#tr').value || 0);
-  live = initLive({ $, esc, picker, getTt: () => tt, hm, toMin, today: berlinToday, fillDateSelect, minTransfer, onFollow: o => nav.start(o) });
-  nav = initNavigate({ $, getTt: () => tt, hm, toMin, today: berlinToday, minTransfer, onWays: a => { showTab('live'); live.fromState(a); } });
-  $('#t0').value = state.t0; $('#stay').value = state.stay; $('#tr').value = state.tr;
-  $('#dtime').value = state.t0;
+  live = initLive({ $, esc, getTt: () => tt, hm, toMin, minTransfer, place, setPlace, onFollow: o => nav.start(o) });
+  nav = initNavigate({ $, getTt: () => tt, hm, toMin, today: berlinToday, minTransfer, onWays: a => { showTab('live', false); live.fromState(a); } });
+  $('#nowon').checked = state.now;
+  if (!state.now) $('#t0').value = state.t0;
+  $('#stay').value = state.stay; $('#tr').value = state.tr;
 
-  for (const id of ['date', 't0', 'stay', 'tr']) $('#' + id).addEventListener('change', runPlan);
-  $('#via').addEventListener('input', () => { if (!$('#via').value.trim()) runPlan(); });
-  $('#plan').onclick = runPlan;
-  $('#swap').onclick = () => { const a = pSrc.get(), b = pDst.get(); pSrc.set(b); pDst.set(a); runPlan(); };
-  $('#clearvia').onclick = () => { pVia.set(-1); runPlan(); };
-  $('#tab-chain').onclick = () => showTab('chain');
-  $('#tab-reach').onclick = () => showTab('reach');
-  $('#tab-deps').onclick = () => showTab('deps');
-  $('#tab-live').onclick = () => showTab('live');
+  // a day or a time set by hand is not the clock any more; the box says "Now" again and the bar follows the clock
+  for (const id of ['date', 't0']) $('#' + id).addEventListener('change', () => { setNow(false); persist(); renderTab(); });
+  for (const id of ['stay', 'tr']) $('#' + id).addEventListener('change', () => { persist(); renderTab(); });
+  $('#nowon').addEventListener('change', () => { if ($('#nowon').checked) applyClock(); persist(); renderTab(); });
+  // text typed into a station box and left again: the bar means what it says now
+  $('#src').addEventListener('change', () => { fromSource = 'manual'; changedPlace(); });
+  $('#dst').addEventListener('change', changedPlace);
+  $('#via').addEventListener('input', () => { if (!$('#via').value.trim()) renderTab(); });
+  $('#plan').onclick = () => renderTab();
+  $('#swap').onclick = () => { const a = pSrc.get(), b = pDst.get(); pSrc.set(b); pDst.set(a); fromSource = 'manual'; changedPlace(); };
+  $('#clearvia').onclick = () => { pVia.set(-1); renderTab(); };
+  for (const n of ['live', 'chain', 'deps', 'reach']) $('#tab-' + n).onclick = () => showTab(n);
   $('#pane-chain').addEventListener('click', ev => {
     if (!lastPlan || !lastPlan.res.legs) return;
     if (ev.target.closest('button[data-follow]')) {
@@ -332,13 +412,13 @@ function initUi() {
     }
     const b = ev.target.closest('button.out');
     if (!b) return;
-    showTab('live');
+    showTab('live', false);
     live.fromChain(lastPlan, +b.dataset.leg);
   });
   $('#hrs').addEventListener('input', () => { $('#hrs-val').textContent = $('#hrs').value; drawReach(); });
   paintReachLabel();
-  $('#dtime').addEventListener('change', drawDeps);
-  $('#date').addEventListener('change', drawDeps);
+  setInterval(clockTick, 15000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') comeBack(); });
   window.addEventListener('resize', () => { if (!$('#pane-reach').hidden) drawReach(); });
 
   const map = $('#map'), tip = $('#tip');
@@ -352,7 +432,7 @@ function initUi() {
   map.addEventListener('click', ev => {
     const { p } = nearestPt(ev);
     if (!p) return;
-    pDst.set(p[2]); showTab('chain'); runPlan();
+    pDst.set(p[2]); live.forget(); persist(); showTab('chain');
   });
 }
 
@@ -379,6 +459,7 @@ function refreshLanguage() {
   if (manifest) showAge(lastAge.note, lastAge.params);
   runPlan();
   if (!$('#pane-deps').hidden) drawDeps();
+  if (!$('#pane-reach').hidden) drawReach();
 }
 
 async function start() {

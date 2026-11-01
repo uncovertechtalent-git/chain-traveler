@@ -20,7 +20,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Language',
-  'meta.sub': 'Chain the next regional trains between any two German stations on the Deutschlandticket, with a stop-over wherever you like. Planned times, read offline from the timetable on this device.',
+  'meta.sub': 'Plan B for the Deutschlandticket: when your regional train is out, see every way on from where you are. Or chain trains between any two German stations. Planned times, read offline from the timetable on this device.',
   'status.loading': 'Loading the timetable...',
   'status.first': 'Loading the timetable for the first time (about 5 MB)...',
   'status.loadFailed': 'The timetable could not be loaded ({message}). The first launch needs an internet connection.',
@@ -42,10 +42,9 @@ export default {
   // ---- the trip form
   'aria.trip': 'Trip',
   'field.station': 'Station',
-  'field.start': 'Start',
   'field.date': 'Date',
-  'field.leaveAfter': 'Leave after',
-  'field.target': 'Target',
+  'field.time': 'Time',
+  'field.now': 'Now',
   'field.via': 'Stop-over (optional)',
   'field.stay': 'Minimum stay (min)',
   'field.change': 'Minimum change (min)',
@@ -86,8 +85,7 @@ export default {
   'reach.note': 'Every dot is a station reachable by regional train. Colour shows how soon you can be there from the start station. Click a dot to chain a trip there.',
 
   // ---- departures
-  'field.after': 'After',
-  'deps.pick': 'Pick a station.',
+  'deps.pick': 'Pick a station above to see its departures.',
   'deps.none': 'No departures after that time.',
   'deps.th.departs': 'Departs',
   'deps.th.line': 'Line',
@@ -97,7 +95,6 @@ export default {
   // ---- Plan B
   'live.intro': 'Your train is out? Say where you are and where you are going. You get the ways on from here, each set against your plan, and how many trains an hour stand behind every leg.',
   'field.iAmAt': 'I am at',
-  'field.timeNow': 'Time now',
   'field.goingTo': 'Going to',
   'field.plannedArr': 'Planned arrival (optional)',
   'btn.locate': 'Use my location',

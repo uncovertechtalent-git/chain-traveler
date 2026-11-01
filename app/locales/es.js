@@ -2,7 +2,7 @@
 export default {
   // ---- header, status, language
   'lang.label': 'Idioma',
-  'meta.sub': 'Encadena los próximos trenes regionales entre dos estaciones alemanas cualesquiera con el Deutschlandticket, con una parada intermedia donde quieras. Horas previstas, leídas sin conexión de los horarios guardados en este dispositivo.',
+  'meta.sub': 'Plan B para el Deutschlandticket: cuando tu tren regional se cancela, mira todas las alternativas para seguir desde donde estás. O encadena trenes entre dos estaciones alemanas cualesquiera. Horas previstas, leídas sin conexión de los horarios guardados en este dispositivo.',
   'status.loading': 'Cargando los horarios...',
   'status.first': 'Cargando los horarios por primera vez (unos 5 MB)...',
   'status.loadFailed': 'No se pudieron cargar los horarios ({message}). El primer inicio necesita conexión a internet.',
@@ -24,10 +24,9 @@ export default {
   // ---- the trip form
   'aria.trip': 'Viaje',
   'field.station': 'Estación',
-  'field.start': 'Origen',
   'field.date': 'Fecha',
-  'field.leaveAfter': 'Salir a partir de',
-  'field.target': 'Destino',
+  'field.time': 'Hora',
+  'field.now': 'Ahora',
   'field.via': 'Parada intermedia (opcional)',
   'field.stay': 'Estancia mínima (min)',
   'field.change': 'Transbordo mínimo (min)',
@@ -68,8 +67,7 @@ export default {
   'reach.note': 'Cada punto es una estación accesible en tren regional. El color indica en cuánto tiempo puedes llegar desde la estación de origen. Haz clic en un punto para planificar una cadena hasta allí.',
 
   // ---- departures
-  'field.after': 'A partir de',
-  'deps.pick': 'Elige una estación.',
+  'deps.pick': 'Elige una estación arriba para ver sus salidas.',
   'deps.none': 'No hay salidas después de esa hora.',
   'deps.th.departs': 'Salida',
   'deps.th.line': 'Línea',
@@ -79,7 +77,6 @@ export default {
   // ---- Plan B
   'live.intro': '¿Tu tren está cancelado? Indica dónde estás y adónde vas. Verás las alternativas para seguir desde aquí, cada una comparada con tu plan, y cuántos trenes por hora hay en cada tramo.',
   'field.iAmAt': 'Estoy en',
-  'field.timeNow': 'Hora actual',
   'field.goingTo': 'Voy a',
   'field.plannedArr': 'Llegada prevista (opcional)',
   'btn.locate': 'Usar mi ubicación',

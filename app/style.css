@@ -149,3 +149,11 @@ button.follow{margin-top:8px}
 .zmap{flex-direction:row;align-items:center;gap:6px;margin-left:auto;font-size:.85rem;color:var(--text);cursor:pointer}
 .zmap input{width:auto;min-height:0;margin:0}
 .zhint{margin:6px 0 0}
+/* the bar every tab shares: where you are, where you go, the day and the time (which can follow the clock) */
+.herecard .controls{align-items:end}
+.herecard .nowbox{color:var(--text);font-size:.9rem}
+.herecard .where{margin-top:12px}
+.herecard .where .note{flex-basis:100%}
+.herecard .moreopts{margin-top:8px}
+.herecard .moreopts input{max-width:8rem;margin-top:6px}
+@media (max-width:480px){.herecard .controls{grid-template-columns:1fr 1fr}.herecard .controls .wide{grid-column:span 2}}
