@@ -75,10 +75,9 @@ export default {
   'deps.th.next': 'Volgende halte',
 
   // ---- Plan B
-  'live.intro': 'Valt je trein uit? Geef aan waar je bent en waar je heen gaat. Je krijgt de opties om verder te komen, elk afgezet tegen je plan, en hoeveel treinen per uur er op elk traject rijden.',
+  'live.intro': 'Valt je trein uit? Geef aan waar je bent en waar je heen gaat. Je krijgt de opties om verder te komen, elk met de aankomsttijd en hoeveel later dan de beste, en hoeveel treinen per uur er op elk traject rijden.',
   'field.iAmAt': 'Ik ben bij',
   'field.goingTo': 'Ik ga naar',
-  'field.plannedArr': 'Geplande aankomst (optioneel)',
   'btn.locate': 'Gebruik mijn locatie',
   'live.say': 'Geef aan waar je bent en waar je heen gaat.',
   'live.depsTitle': 'Treinen vanaf {station} na {time}',
@@ -87,7 +86,7 @@ export default {
   'live.unlisted': { one: 'Nog {n} trein eerder als uitgevallen aangemerkt, niet in deze lijst.', other: 'Nog {n} treinen eerder als uitgevallen aangemerkt, niet in deze lijst.' },
   'live.leadPlan': 'Aankomst volgens je plan: {plan}. Beste optie om verder te komen: aankomst {best}{later}.',
   'live.later': ', {dur} later',
-  'live.leadBest': 'Geen geplande aankomst opgegeven, dus de beste optie (aankomst {best}) is de maatstaf.',
+  'live.leadBest': 'De beste optie komt aan om {best}; de andere opties zijn daarmee vergeleken.',
   'graph.label': 'Opties van {from} naar {to}',
 
   // ---- Plan B: how a way compares

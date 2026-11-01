@@ -77,10 +77,9 @@ export default {
   'deps.th.next': 'Sonraki durak',
 
   // ---- Plan B
-  'live.intro': 'Treniniz iptal mi? Nerede olduğunuzu ve nereye gittiğinizi belirtin. Buradan devam etme seçeneklerini, planınızla karşılaştırmalı olarak ve her bölümde saatte kaç tren olduğuyla birlikte görürsünüz.',
+  'live.intro': 'Treniniz iptal mi? Nerede olduğunuzu ve nereye gittiğinizi belirtin. Buradan devam etme seçeneklerini, her biri için varış saati ve en iyisinden ne kadar geç olduğuyla ve her bölümde saatte kaç tren olduğuyla birlikte görürsünüz.',
   'field.iAmAt': 'Bulunduğum yer',
   'field.goingTo': 'Gideceğim yer',
-  'field.plannedArr': 'Planlanan varış (isteğe bağlı)',
   'btn.locate': 'Konumumu kullan',
   'live.say': 'Nerede olduğunuzu ve nereye gittiğinizi belirtin.',
   'live.depsTitle': '{station} çıkışlı trenler, {time} sonrası',
@@ -89,7 +88,7 @@ export default {
   'live.unlisted': { one: 'Daha önce iptal olarak işaretlenen {n} tren daha bu listede yok.', other: 'Daha önce iptal olarak işaretlenen {n} tren daha bu listede yok.' },
   'live.leadPlan': 'Planlanan varışınız {plan} idi. Şimdi en iyi devam seçeneğiyle varış saati {best}{later}.',
   'live.later': ', {dur} daha geç',
-  'live.leadBest': 'Planlanan varış verilmedi; ölçüt en iyi devam seçeneğidir (varış {best}).',
+  'live.leadBest': 'En iyi devam seçeneği {best} saatinde varır; diğerleri onunla karşılaştırılır.',
   'graph.label': '{from} – {to} arası devam seçenekleri',
 
   // ---- Plan B: how a way compares

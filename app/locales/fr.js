@@ -75,10 +75,9 @@ export default {
   'deps.th.next': 'Prochain arrêt',
 
   // ---- Plan B
-  'live.intro': 'Votre train est supprimé ? Indiquez où vous êtes et où vous allez. Vous obtenez les options pour continuer d’ici, chacune comparée à votre plan, et le nombre de trains par heure sur chaque tronçon.',
+  'live.intro': 'Votre train est supprimé ? Indiquez où vous êtes et où vous allez. Vous obtenez les options pour continuer d’ici, chacune avec son heure d’arrivée et son écart avec la meilleure, et le nombre de trains par heure sur chaque tronçon.',
   'field.iAmAt': 'Je suis à',
   'field.goingTo': 'Je vais à',
-  'field.plannedArr': 'Arrivée prévue (facultatif)',
   'btn.locate': 'Utiliser ma position',
   'live.say': 'Indiquez où vous êtes et où vous allez.',
   'live.depsTitle': 'Trains depuis {station} après {time}',
@@ -87,7 +86,7 @@ export default {
   'live.unlisted': { one: '{n} autre train déjà marqué supprimé, absent de cette liste.', other: '{n} autres trains déjà marqués supprimés, absents de cette liste.' },
   'live.leadPlan': 'Votre plan arrivait à {plan}. La meilleure option pour continuer arrive à {best}{later}.',
   'live.later': ', {dur} plus tard',
-  'live.leadBest': 'Aucune arrivée prévue indiquée : la meilleure option (arrivée {best}) sert de référence.',
+  'live.leadBest': 'La meilleure option arrive à {best} ; les autres sont comparées à elle.',
   'graph.label': 'Options : {from} à {to}',
 
   // ---- Plan B: how a way compares

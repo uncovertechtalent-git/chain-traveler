@@ -22,7 +22,7 @@ input,select{font:inherit;font-size:16px;color:var(--text);background:var(--bg);
 button{font:inherit;cursor:pointer;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 14px;min-height:40px}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
 button:hover{filter:brightness(.97)}
-.tabs{display:flex;gap:6px;margin:0 0 10px}
+.tabs{display:flex;gap:6px;margin:0}
 .tabs button{border-radius:8px 8px 0 0;border-bottom:none;color:var(--muted)}
 .tabs button[aria-selected="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--text);font-weight:600}
 .sum{display:flex;flex-wrap:wrap;gap:6px 22px;margin:0 0 12px}
@@ -157,3 +157,16 @@ button.follow{margin-top:8px}
 .herecard .moreopts{margin-top:8px}
 .herecard .moreopts input{max-width:8rem;margin-top:6px}
 @media (max-width:480px){.herecard .controls{grid-template-columns:1fr 1fr}.herecard .controls .wide{grid-column:span 2}}
+/* a phone: a grid column may be narrower than the content of its widest item (iOS gives a time field a width of its own),
+   so the columns can shrink and the fields fit the card */
+@media (max-width:480px){.herecard .controls{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.controls>label{min-width:0}
+input[type="time"],input[type="date"]{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none;text-align:left}
+input[type="time"]::-webkit-date-and-time-value{text-align:left}
+/* the departures: four columns that share the width of the card and wrap, instead of a table wider than the screen */
+table.deps{table-layout:fixed}
+table.deps td{overflow-wrap:anywhere}
+table.deps th{overflow-wrap:normal}
+table.deps .dt{width:4rem}
+table.deps .dl{width:4.6rem}
+@media (max-width:480px){table.deps td,table.deps th{padding:5px 3px;font-size:.85rem}table.deps .dt{width:3.7rem}table.deps .dl{width:3.9rem}table.deps .line{margin:0}}

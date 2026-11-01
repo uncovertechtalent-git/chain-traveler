@@ -93,10 +93,9 @@ export default {
   'deps.th.next': 'Next stop',
 
   // ---- Plan B
-  'live.intro': 'Your train is out? Say where you are and where you are going. You get the ways on from here, each set against your plan, and how many trains an hour stand behind every leg.',
+  'live.intro': 'Your train is out? Say where you are and where you are going. You get the ways on from here, each with the time it arrives and how much later than the best one, and how many trains an hour stand behind every leg.',
   'field.iAmAt': 'I am at',
   'field.goingTo': 'Going to',
-  'field.plannedArr': 'Planned arrival (optional)',
   'btn.locate': 'Use my location',
   'live.say': 'Say where you are and where you are going.',
   'live.depsTitle': 'Trains from {station} after {time}',
@@ -105,7 +104,7 @@ export default {
   'live.unlisted': { one: '{n} more marked out earlier, not in this list.', other: '{n} more marked out earlier, not in this list.' },
   'live.leadPlan': 'Your plan arrived at {plan}. The best way on now arrives at {best}{later}.',
   'live.later': ', {dur} later',
-  'live.leadBest': 'No planned arrival given, so the best way on (arriving {best}) is the yardstick.',
+  'live.leadBest': 'The best way on arrives at {best}; the other ways are set against it.',
   'graph.label': 'Ways from {from} to {to}',
 
   // ---- Plan B: how a way compares

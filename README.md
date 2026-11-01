@@ -88,7 +88,7 @@ timetable on the device, in tens of milliseconds.
    chain; then it asks again for the earliest chain that leaves after the first train of the previous one, up to four
    distinct ways inside three hours of the best arrival.
 2. **Colour.** How much later than your plan a way arrives, if every train on it runs as planned: green up to 15
-   minutes, amber up to 60, red beyond. Without a planned arrival the best way is the yardstick. Every way also says
+   minutes, amber up to 60, red beyond. The plan comes from the chain or from Navigate that you came from; without one the best way is the yardstick (there is no box to type a planned arrival into: every way shows the time it arrives and how much later than the best it is, and you pick). Every way also says
    it in words ("on plan", "late, +1 h 00 min"), so colour is never the only carrier.
 3. **Thickness.** Trains an hour on a leg: the runs that leave the boarding station within half an hour either way and
    call at the alighting station. One is thin, four or more is thick. It says how many fallbacks you have if you miss

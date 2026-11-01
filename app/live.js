@@ -9,13 +9,14 @@ import { zoomView, showMap } from './zoomview.js';
 export function initLive({ $, esc, getTt, hm, toMin, minTransfer, place, setPlace, onFollow }) {
   let out = new Set();     // runs marked as out (engine tripKey values)
   let ghost = null;        // the legs of the original plan still ahead, when we came from the chain view
+  let plannedClock = null; // the arrival that plan promised, as a time of day in minutes; none unless we came from a chain or Navigate
   let drawnWidth = 0;      // the width the graph was last drawn at
   let lastRun = null;      // what the ways on were asked for and found, for "Follow this way"
   let contextRun = 0;      // counts runs, so a network that arrives for a replaced run is dropped
   let known = { tt: null, key: '', context: null };   // the last network around you, for a redraw with the same inputs
 
   const zoom = zoomView();   // the graph, which keeps its place and its zoom while the ways are drawn again
-  const forget = () => { out = new Set(); ghost = null; zoom.reset(); };
+  const forget = () => { out = new Set(); ghost = null; plannedClock = null; zoom.reset(); };
   // A time of day, with +1 after midnight of the chosen date, so a train on the next day is not read as one today.
   const at = m => hm(m) + (m >= 1440 ? ` +${Math.floor(m / 1440)}` : '');
   // Replace what an element shows only when the text of it changed: a minute that changes nothing leaves the page, the
@@ -58,7 +59,7 @@ export function initLive({ $, esc, getTt, hm, toMin, minTransfer, place, setPlac
       return;
     }
     let planned = null;
-    if ($('#lplan').value) { planned = toMin($('#lplan').value); if (planned < t0) planned += 1440; }
+    if (plannedClock !== null) { planned = plannedClock; if (planned < t0) planned += 1440; }
 
     const list = tt.departures({ day, station: src, t: t0, limit: 8 });
     const listed = new Set(list.map(d => tt.tripKey(d.svcDay, d.trip)));
@@ -149,7 +150,6 @@ export function initLive({ $, esc, getTt, hm, toMin, minTransfer, place, setPlac
     if (box.checked) out.add(k); else out.delete(k);
     run();
   });
-  $('#lplan').addEventListener('change', run);
   window.addEventListener('resize', () => { if (!$('#pane-live').hidden && Math.abs(($('#lres').clientWidth || 0) - drawnWidth) > 40) run(); });
 
   $('#lres').addEventListener('click', ev => {
@@ -173,7 +173,7 @@ export function initLive({ $, esc, getTt, hm, toMin, minTransfer, place, setPlac
       const shift = Math.floor(leg.dep / 1440);
       forget();
       setPlace({ src: leg.from, dst: q.dst, day: Math.min(tt.nDays - 1, q.day + shift), time: hm(leg.dep), now: false, from: 'manual' });
-      $('#lplan').value = hm(last.arr);
+      plannedClock = ((last.arr % 1440) + 1440) % 1440;
       out.add(tt.tripKey(leg.svcDay, leg.trip));
       ghost = res.legs.slice(i).filter(l => !l.walk).map(l => ({ from: l.from, to: l.to }));
       run();
@@ -183,7 +183,7 @@ export function initLive({ $, esc, getTt, hm, toMin, minTransfer, place, setPlac
       const tt = getTt();
       forget();
       setPlace({ src, dst, day: Math.min(tt.nDays - 1, day + Math.floor(t0 / 1440)), time: hm(t0), now: false, from: 'manual' });
-      $('#lplan').value = hm(plannedArr);
+      plannedClock = ((plannedArr % 1440) + 1440) % 1440;
       for (const k of outKeys) out.add(k);
       run();
     },
