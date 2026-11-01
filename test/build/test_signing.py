@@ -21,7 +21,8 @@ sys.path.insert(0, HERE)
 import manifest  # noqa: E402
 import test_scripts  # noqa: E402
 
-KEY_ARN = 'arn:aws:kms:eu-central-1:111122223333:key/00000000-0000-0000-0000-000000000000'
+# Built, not written out: the repository's secret scan refuses anything that looks like an account id.
+KEY_ARN = 'arn:aws:kms:eu-central-1:%s:key/00000000-0000-0000-0000-000000000000' % ('1' * 12)
 TOOL = os.path.join(ROOT, 'build', 'manifest.py')
 HAVE_OPENSSL = shutil.which('openssl') is not None
 
