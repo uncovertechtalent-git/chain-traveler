@@ -191,6 +191,7 @@ export default {
 
   // ---- footer
   'foot': 'Расписание: {publisher}, {license}. Станций: {stations}, соединений: {connections}, период {first} – {last}. Только плановое время, без задержек и ремонтных работ. Перед поездкой проверьте маршрут в DB Navigator.',
+  'foot.map': 'Карта: Natural Earth (общественное достояние).',
 
   // ---- units. {n} is a number
   'unit.h': 'ч',
@@ -198,6 +199,13 @@ export default {
   'unit.m': '{n} м',
   'unit.km': '{n} км',
   'unit.perHour': '{n}/ч',
+
+  // ---- the map behind the graphs
+  'map.show': 'Показать карту',
+  'map.zoomIn': 'Приблизить',
+  'map.zoomOut': 'Отдалить',
+  'map.fit': 'Вписать',
+  'map.hint': 'Тяните, чтобы сдвинуть. Масштаб: щипок или Ctrl/⌘ + колесо.',
 
   // ---- the page for an address that does not exist
   'nf.title': 'Не найдено',

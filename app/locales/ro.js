@@ -190,6 +190,7 @@ export default {
 
   // ---- footer
   'foot': 'Orar: {publisher}, {license}. Gări: {stations}, conexiuni: {connections}, perioada {first} – {last}. Doar ore planificate, fără întârzieri sau lucrări pe linie. Verificați călătoria în DB Navigator înainte de plecare.',
+  'foot.map': 'Harta: Natural Earth (domeniu public).',
 
   // ---- units. {n} is a number
   'unit.h': 'h',
@@ -197,6 +198,13 @@ export default {
   'unit.m': '{n} m',
   'unit.km': '{n} km',
   'unit.perHour': '{n}/h',
+
+  // ---- the map behind the graphs
+  'map.show': 'Arată harta',
+  'map.zoomIn': 'Mărește',
+  'map.zoomOut': 'Micșorează',
+  'map.fit': 'Potrivește',
+  'map.hint': 'Trage pentru a muta. Zoom: ciupire sau Ctrl/⌘ + rotița.',
 
   // ---- the page for an address that does not exist
   'nf.title': 'Pagină negăsită',

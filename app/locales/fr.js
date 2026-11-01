@@ -181,6 +181,7 @@ export default {
 
   // ---- footer
   'foot': 'Horaires : {publisher}, {license}. {stations} gares, {connections} liaisons, du {first} au {last}. Heures prévues uniquement, sans retards ni travaux. Vérifiez votre trajet dans DB Navigator avant de partir.',
+  'foot.map': 'Carte : Natural Earth (domaine public).',
 
   // ---- units. {n} is a number
   'unit.h': 'h',
@@ -188,6 +189,13 @@ export default {
   'unit.m': '{n} m',
   'unit.km': '{n} km',
   'unit.perHour': '{n}/h',
+
+  // ---- the map behind the graphs
+  'map.show': 'Afficher la carte',
+  'map.zoomIn': 'Zoom avant',
+  'map.zoomOut': 'Zoom arrière',
+  'map.fit': 'Ajuster',
+  'map.hint': 'Glissez pour déplacer. Zoom : pincez ou Ctrl/⌘ + molette.',
 
   // ---- the page for an address that does not exist
   'nf.title': 'Introuvable',

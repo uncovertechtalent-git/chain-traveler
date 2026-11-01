@@ -181,6 +181,7 @@ export default {
 
   // ---- footer
   'foot': 'Разписание: {publisher}, {license}. Гари: {stations}, връзки: {connections}, от {first} до {last}. Само планирани часове, без закъснения и ремонтни работи. Проверете пътуването в DB Navigator, преди да тръгнете.',
+  'foot.map': 'Карта: Natural Earth (обществено достояние).',
 
   // ---- units. {n} is a number
   'unit.h': 'ч',
@@ -188,6 +189,13 @@ export default {
   'unit.m': '{n} м',
   'unit.km': '{n} км',
   'unit.perHour': '{n}/ч',
+
+  // ---- the map behind the graphs
+  'map.show': 'Покажи картата',
+  'map.zoomIn': 'Увеличи',
+  'map.zoomOut': 'Намали',
+  'map.fit': 'Побери',
+  'map.hint': 'Влачете за преместване. Мащаб: щипване или Ctrl/⌘ + колелцето.',
 
   // ---- the page for an address that does not exist
   'nf.title': 'Страницата не е намерена',

@@ -3,6 +3,7 @@
 import { t, th, raw, dur, minutes, dist, errText } from './i18n.js';
 import { plan, graphOf, contextOf, GOOD_MIN, LATE_MIN } from './planb.js';
 import { svgOf } from './graph.js';
+import { zoomView, showMap } from './zoomview.js';
 
 export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSelect, minTransfer, onFollow }) {
   const pSrc = picker($('#lsrc'), () => { forget(); run(); });
@@ -15,7 +16,8 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
   let contextRun = 0;      // counts runs, so a network that arrives for a replaced run is dropped
   let known = { tt: null, key: '', context: null };   // the last network around you, for a redraw with the same inputs
 
-  const forget = () => { out = new Set(); ghost = null; };
+  const zoom = zoomView();   // the graph, which keeps its place and its zoom while the ways are drawn again
+  const forget = () => { out = new Set(); ghost = null; zoom.reset(); };
   // A time of day, with +1 after midnight of the chosen date, so a train on the next day is not read as one today.
   const at = m => hm(m) + (m >= 1440 ? ` +${Math.floor(m / 1440)}` : '');
   const nowHm = () => new Date().toLocaleTimeString('sv-SE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
@@ -78,8 +80,11 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
     drawnWidth = Math.max(300, Math.min(720, res.clientWidth || 720));
     const paint = context => {
       const model = graphOf(tt, result, { ghost, context });
-      const svg = svgOf(model, { width: drawnWidth, height: Math.round(drawnWidth * (drawnWidth < 500 ? 1.15 : 0.72)), label: t('graph.label', { from: tt.names[src], to: tt.names[dst] }), min: t('unit.min') });
-      res.innerHTML = `<p class="lead2">${esc(lead)}</p>${svg}${legend(result.baseKind, !!context && context.nodes.length > 0)}<ol class="opts">${result.options.map((o, i) => optionHtml(tt, o, result.baseKind, i)).join('')}</ol>`;
+      const width = drawnWidth, height = Math.round(width * (width < 500 ? 1.15 : 0.72));
+      const label = t('graph.label', { from: tt.names[src], to: tt.names[dst] }), min = t('unit.min');
+      res.innerHTML = `<p class="lead2">${esc(lead)}</p><div class="zslot"></div>${legend(result.baseKind, !!context && context.nodes.length > 0)}<ol class="opts">${result.options.map((o, i) => optionHtml(tt, o, result.baseKind, i)).join('')}</ol>`;
+      zoom.show({ width, height, draw: view => svgOf(model, { width, height, label, min, basemap: showMap(), view }) });
+      res.querySelector('.zslot').replaceWith(zoom.el);
     };
     // The network around you, as quiet background: where else you could get to, as far as the way on takes and a bit
     // more. It needs a scan of its own, so the ways are drawn first and the network follows; a run that was replaced

@@ -183,6 +183,7 @@ export default {
 
   // ---- footer
   'foot': 'Sefer saatleri: {publisher}, {license}. {stations} istasyon, {connections} bağlantı, {first} – {last}. Yalnızca planlanan saatler; gecikmeler ve yol çalışmaları yok. Yola çıkmadan önce yolculuğu DB Navigator uygulamasında kontrol edin.',
+  'foot.map': 'Harita: Natural Earth (kamu malı).',
 
   // ---- units. {n} is a number
   'unit.h': 'sa',
@@ -190,6 +191,13 @@ export default {
   'unit.m': '{n} m',
   'unit.km': '{n} km',
   'unit.perHour': '{n}/sa',
+
+  // ---- the map behind the graphs
+  'map.show': 'Haritayı göster',
+  'map.zoomIn': 'Yakınlaştır',
+  'map.zoomOut': 'Uzaklaştır',
+  'map.fit': 'Sığdır',
+  'map.hint': 'Taşımak için sürükleyin. Yakınlaştırmak için iki parmakla sıkıştırın veya Ctrl/⌘ + tekerlek.',
 
   // ---- the page for an address that does not exist
   'nf.title': 'Sayfa bulunamadı',

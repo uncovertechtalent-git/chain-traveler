@@ -39,7 +39,7 @@ test('index.html has no inline script, no inline style and no event handler attr
 });
 
 test('the scripts do not build markup with inline styles or handlers', () => {
-  for (const f of ['app.js', 'data-store.js', 'engine.js', 'planb.js', 'graph.js', 'live.js', 'navigate.js', 'i18n.js', 'notfound.js']) {
+  for (const f of ['app.js', 'data-store.js', 'engine.js', 'planb.js', 'graph.js', 'zoomview.js', 'live.js', 'navigate.js', 'i18n.js', 'notfound.js']) {
     const js = read(f);
     assert.ok(!/style\s*=\s*["'\\]/.test(js.replace(/\.style\.[a-z]+\s*=/g, '')), f + ': style attribute in markup');
     assert.ok(!/\son(click|load|error|input|change)\s*=\s*["']/.test(js), f + ': handler attribute in markup');

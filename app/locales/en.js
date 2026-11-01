@@ -201,6 +201,7 @@ export default {
 
   // ---- footer
   'foot': 'Timetable: {publisher}, {license}. {stations} stations, {connections} connections, {first} to {last}. Planned times only, no delays or engineering works. Check the trip in DB Navigator before you travel.',
+  'foot.map': 'Map: Natural Earth (public domain).',
 
   // ---- units. {n} is a number
   'unit.h': 'h',
@@ -208,6 +209,13 @@ export default {
   'unit.m': '{n} m',
   'unit.km': '{n} km',
   'unit.perHour': '{n}/h',
+
+  // ---- the map behind the graphs
+  'map.show': 'Show map',
+  'map.zoomIn': 'Zoom in',
+  'map.zoomOut': 'Zoom out',
+  'map.fit': 'Fit',
+  'map.hint': 'Drag to move. Pinch or Ctrl/⌘ + wheel to zoom.',
 
   // ---- the page for an address that does not exist
   'nf.title': 'Not found',
