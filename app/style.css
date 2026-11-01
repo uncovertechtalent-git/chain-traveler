@@ -121,3 +121,8 @@ button.near{min-height:30px;padding:2px 10px;font-size:.85rem;margin:2px 0}
 .navtest{margin:6px 2px 12px}
 button.mini-btn,button.follow{min-height:32px;padding:2px 12px;font-size:.85rem}
 button.follow{margin-top:8px}
+.pb .e.act{stroke:var(--accent);opacity:.95}
+.pb .me{fill:var(--accent);stroke:var(--bg);stroke-width:2}
+.pb .me.halo{fill:var(--accent);fill-opacity:.25;stroke:none}
+.pb text.me{fill:var(--accent)}
+.navgraph{margin:10px 0 0}

@@ -5,8 +5,9 @@
 //
 // The logic (where, assess, replan, tripOf) is pure and runs in Node; initNavigate() is the card on the page. Time is in
 // minutes after midnight of the chain's first day, as everywhere in the app, and may pass 1440.
-import { plan } from './planb.js';
-import { th, dur, dist, dayLabel } from './i18n.js';
+import { plan, graphOf } from './planb.js';
+import { svgOf } from './graph.js';
+import { t, th, dur, dist, dayLabel } from './i18n.js';
 
 export const MISSED_AFTER = 2;        // minutes after departure at the boarding station before the position says "missed"
 export const NEAR_KM = 0.6;           // within this distance of a station you are at it
@@ -63,6 +64,36 @@ export function replan(tt, nav, { now, src, missedKey = null, minTransfer = 4 })
   return { option: r.options[0], options: r.options, base: r.base };
 }
 
+// Where to draw you on the map: the position the device gave, else where the clock puts you: at the station you wait at,
+// on the line between the two stations of the leg you ride (by the fraction of its time gone), at the end when done.
+export function positionOf(tt, legs, now, here = null) {
+  if (here && Number.isFinite(here.lat) && Number.isFinite(here.lon)) return { lat: here.lat, lon: here.lon, source: 'device' };
+  const w = where(legs, now);
+  const at = s => ({ lat: tt.lat[s], lon: tt.lon[s] });
+  if (w.phase === 'done') return { ...at(legs[legs.length - 1].to), source: 'clock' };
+  if (w.phase === 'before' || w.phase === 'waiting') return { ...at(w.leg.from), source: 'clock' };
+  const f = Math.min(1, Math.max(0, (now - w.leg.dep) / Math.max(1, w.leg.arr - w.leg.dep)));
+  const a = at(w.leg.from), b = at(w.leg.to);
+  return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + (b.lon - a.lon) * f, source: 'clock' };
+}
+
+// The ways around the route: if the next train you have not boarded is out, from the station you would board it at, at
+// the minute you would be there, against the plan you first had. null when there is no train ahead to be out.
+export function whatIf(tt, nav, now, minTransfer = 4) {
+  const w = where(nav.legs, now);
+  if (w.phase === 'done') return null;
+  const from = w.phase === 'riding' || w.phase === 'walking' ? w.i + 1 : w.i;
+  const next = nav.legs.slice(from).find(l => !l.walk);
+  if (!next) return null;
+  const k = nav.legs.indexOf(next);
+  const t0 = Math.max(now, k > 0 ? nav.legs[k - 1].arr : now);
+  const key = next.trip !== undefined ? tt.tripKey(next.svcDay, next.trip) : tripOf(tt, nav.day, next.from, next.dep, next.line);
+  const exclude = new Set(nav.out);
+  if (key !== null) exclude.add(key);
+  const result = plan(tt, { day: nav.day, src: next.from, dst: nav.dst, t0, plannedArr: nav.plannedArr, exclude, minTransfer });
+  return { result, src: next.from, t0, next };
+}
+
 // ---- storage: names and times, because station and trip numbers change with the timetable
 export function toStored(tt, nav) {
   const name = s => tt.names[s];
@@ -107,6 +138,7 @@ export function initNavigate({ $, getTt, hm, toMin, today, minTransfer, onWays }
   let watch = null;          // watchPosition id while tracking
   let tracking = false, trackNote = null;
   let timer = null, lastHtml = '';
+  let shown = { key: '', what: null };   // the ways around the route, worked out at most every few minutes
 
   const save = () => { try { if (nav) localStorage.setItem(STORE, JSON.stringify(toStored(getTt(), nav))); else localStorage.removeItem(STORE); } catch { /* storage unavailable */ } };
 
@@ -124,7 +156,8 @@ export function initNavigate({ $, getTt, hm, toMin, today, minTransfer, onWays }
 
   function say(key, params = {}) { banner = { key, params }; }
 
-  function recalculate(tt, n, src, missed) {
+  function recalculate(tt, n, src, missed, fromIndex) {
+    nav.previous = nav.legs.slice(fromIndex).filter(l => !l.walk).map(l => ({ from: l.from, to: l.to }));
     const missedKey = missed ? (missed.trip !== undefined ? tt.tripKey(missed.svcDay, missed.trip) : tripOf(tt, nav.day, missed.from, missed.dep, missed.line)) : null;
     if (missed && missedKey !== null) nav.outNamed = [...(nav.outNamed || []), { from: tt.names[missed.from], dep: missed.dep, line: missed.line }];
     const r = replan(tt, nav, { now: n, src, missedKey, minTransfer: minTransfer() });
@@ -146,7 +179,7 @@ export function initNavigate({ $, getTt, hm, toMin, today, minTransfer, onWays }
       const leg = a.w.leg;
       const src = a.alert.kind === 'elsewhere' ? a.alert.station : leg.from;
       const old = { line: leg.line, dep: leg.dep, from: leg.from, expected: leg.from };
-      const r = recalculate(tt, n, src, a.alert.kind === 'missed' ? leg : null);
+      const r = recalculate(tt, n, src, a.alert.kind === 'missed' ? leg : null, a.w.i);
       if (r) {
         const arr = r.option.arr;
         say(a.alert.kind === 'missed' ? 'nav.recalc.missed' : 'nav.recalc.elsewhere', {
@@ -156,6 +189,23 @@ export function initNavigate({ $, getTt, hm, toMin, today, minTransfer, onWays }
       }
     }
     render();
+  }
+
+  // The map: your route bold, the ways if the next train is out coloured by how much later they arrive, the plan before
+  // the last recalculation dotted, and you. Redrawn at every tick (you move); the ways are worked out every few minutes.
+  function graphHtml(tt, n, fresh) {
+    const w = where(nav.legs, n);
+    const next = nav.legs.slice(w.phase === 'riding' || w.phase === 'walking' ? w.i + 1 : w.i).find(l => !l.walk);
+    const key = [nav.day, nav.recalcs, nav.out.size, next ? legKey(next) : 'none', Math.floor(n / 3)].join('|');
+    if (shown.key !== key) shown = { key, what: whatIf(tt, nav, n, minTransfer()) };
+    const what = shown.what;
+    const result = what && !what.result.error ? what.result : { options: [], src: nav.legs[0].from, dst: nav.dst, t0: n, baseKind: 'plan' };
+    const active = nav.legs.slice(w.i).filter(l => !l.walk);
+    const mePos = positionOf(tt, nav.legs, n, fresh);
+    const model = graphOf(tt, result, { ghost: nav.previous, active, me: { lat: mePos.lat, lon: mePos.lon, label: t('nav.here') } });
+    const width = Math.max(300, Math.min(720, card.clientWidth || 720));
+    const svg = svgOf(model, { width, height: Math.round(width * (width < 500 ? 0.95 : 0.6)), label: t('nav.graph'), min: t('unit.min') });
+    return `<div class="navgraph">${svg}</div><p class="note">${th('nav.legendRoute')}${nav.previous ? ` ${th('nav.legendOld')}` : ''}</p>`;
   }
 
   function legLine(tt, l) {
@@ -169,6 +219,7 @@ export function initNavigate({ $, getTt, hm, toMin, today, minTransfer, onWays }
     if (!nav || !tt) { wrap.hidden = true; return; }
     wrap.hidden = false;
     const n = now();
+    const fresh = here && Date.now() - here.at <= POSITION_MAX_AGE ? here : null;
     const last = nav.legs[nav.legs.length - 1];
     const chainDay = dayLabel(tt.dateOf(nav.day));
     let h = `<div class="navhead"><b>${th('nav.title')}</b> <span class="mute">${th('nav.to', { station: tt.names[nav.dst] })}</span> <button type="button" class="mini-btn" data-nav="stop">${th('nav.stop')}</button></div>`;
@@ -189,6 +240,7 @@ export function initNavigate({ $, getTt, hm, toMin, today, minTransfer, onWays }
       else if (w.phase === 'riding') main = th('nav.riding', { line: l.line, to: tt.names[l.to], arr: hm(l.arr), inMin: dur(w.inMin) });
       else main = th('nav.walking', { to: tt.names[l.to], inMin: dur(w.inMin) });
       h += `<p class="navnow">${main}</p>`;
+      h += graphHtml(tt, n, fresh);
       const next = nav.legs[w.i + 1];
       if (w.phase !== 'done' && next) h += `<p class="note">${th('nav.then', { leg: legLine(tt, next), dep: hm(next.dep) })}</p>`;
       h += `<p class="note">${th('nav.arriving', { arr: hm(last.arr), plan: hm(nav.plannedArr) })}${last.arr > nav.plannedArr ? ` ${th('nav.later', { delta: dur(last.arr - nav.plannedArr) })}` : ''}${nav.recalcs ? ` ${th('nav.recalcs', { n: nav.recalcs })}` : ''}</p>`;
@@ -211,7 +263,7 @@ export function initNavigate({ $, getTt, hm, toMin, today, minTransfer, onWays }
     const near = tt.nearby({ lat, lon, limit: 1, maxKm: 5 })[0] || null;
     const rad = Math.PI / 180;
     const distTo = s => 12742 * Math.asin(Math.sqrt(Math.sin((tt.lat[s] - lat) * rad / 2) ** 2 + Math.cos(lat * rad) * Math.cos(tt.lat[s] * rad) * Math.sin((tt.lon[s] - lon) * rad / 2) ** 2));
-    here = { station: near ? near.station : null, km: near ? near.km : null, distTo, at: Date.now() };
+    here = { station: near ? near.station : null, km: near ? near.km : null, distTo, at: Date.now(), lat, lon };
     trackNote = near ? { key: 'nav.near', params: { station: tt.names[near.station], dist: dist(near.km) } } : { key: 'nav.nowhere', params: {} };
     tick();
   }
@@ -257,7 +309,8 @@ export function initNavigate({ $, getTt, hm, toMin, today, minTransfer, onWays }
   const api = {
     // Follow these legs. plannedArr: the arrival you planned (the yardstick for every recalculation).
     start({ day, legs, dst, plannedArr, out = new Set() }) {
-      nav = { day, legs, dst, plannedArr, out: new Set(out), outNamed: [], confirmed: {}, recalcs: 0 };
+      nav = { day, legs, dst, plannedArr, out: new Set(out), outNamed: [], confirmed: {}, recalcs: 0, previous: null };
+      shown = { key: '', what: null };
       banner = null;
       save();
       if (!timer) timer = setInterval(tick, 15000);

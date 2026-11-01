@@ -184,6 +184,10 @@ export default {
   'nav.privacy': 'Your position, if you allow it, stays on this device.',
   'nav.near': 'You are near {station} ({dist}).',
   'nav.nowhere': 'No station with trains within 5 km of you.',
+  'nav.here': 'You are here',
+  'nav.graph': 'Your route and the ways around it',
+  'nav.legendRoute': 'Thick line: your route. Colours: the other ways if the next train is out, by how much later they arrive.',
+  'nav.legendOld': 'Dotted: the plan before the last recalculation.',
   'nav.test': 'Test the clock',
   'nav.clock': 'Pretend it is',
 

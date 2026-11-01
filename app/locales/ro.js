@@ -161,6 +161,10 @@ export default {
   'nav.privacy': 'Poziția dvs., dacă o permiteți, rămâne pe acest dispozitiv.',
   'nav.near': 'Vă aflați lângă {station} ({dist}).',
   'nav.nowhere': 'Nicio gară cu trenuri pe o rază de 5 km.',
+  'nav.here': 'Sunteți aici',
+  'nav.graph': 'Traseul dvs. și variantele din jurul lui',
+  'nav.legendRoute': 'Linia groasă: traseul dvs. Culori: celelalte variante dacă următorul tren este anulat, în funcție de cât de mult mai târziu ajungeți.',
+  'nav.legendOld': 'Linia punctată: planul de dinainte de ultima recalculare.',
   'nav.test': 'Ceas de test',
   'nav.clock': 'Presupuneți că este',
 

@@ -152,6 +152,10 @@ export default {
   'nav.privacy': 'Als je het toestaat, blijft je positie op dit apparaat.',
   'nav.near': 'Je bent in de buurt van {station} ({dist}).',
   'nav.nowhere': 'Geen station met treinen binnen 5 km van je.',
+  'nav.here': 'Je bent hier',
+  'nav.graph': 'Je route en de opties eromheen',
+  'nav.legendRoute': 'Dikke lijn: je route. Kleuren: de andere opties als de volgende trein uitvalt, afhankelijk van hoeveel later je aankomt.',
+  'nav.legendOld': 'Stippellijn: het plan van vóór de laatste herberekening.',
   'nav.test': 'Testklok',
   'nav.clock': 'Zet de klok op',
 

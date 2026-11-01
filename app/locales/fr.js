@@ -152,6 +152,10 @@ export default {
   'nav.privacy': 'Si vous l’autorisez, votre position reste sur cet appareil.',
   'nav.near': 'Gare à proximité : {station} ({dist}).',
   'nav.nowhere': 'Aucune gare desservie par des trains à moins de 5 km.',
+  'nav.here': 'Vous êtes ici',
+  'nav.graph': 'Votre trajet et les autres options',
+  'nav.legendRoute': 'Trait épais : votre trajet. Couleurs : les autres options si le prochain train est supprimé, selon le retard à l’arrivée.',
+  'nav.legendOld': 'Trait pointillé : le plan avant le dernier recalcul.',
   'nav.test': 'Horloge de test',
   'nav.clock': 'Faire comme s’il était',
 

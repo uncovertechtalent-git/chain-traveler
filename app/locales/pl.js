@@ -162,6 +162,10 @@ export default {
   'nav.privacy': 'Jeśli zezwolisz, twoja pozycja zostaje na tym urządzeniu.',
   'nav.near': 'Jesteś blisko stacji {station} ({dist}).',
   'nav.nowhere': 'W promieniu 5 km od ciebie nie ma stacji z pociągami.',
+  'nav.here': 'Tu jesteś',
+  'nav.graph': 'Twoja trasa i opcje wokół niej',
+  'nav.legendRoute': 'Gruba linia: twoja trasa. Kolory: inne opcje, gdy następny pociąg jest odwołany, zależnie od tego, o ile później przyjedziesz.',
+  'nav.legendOld': 'Linia kropkowana: plan sprzed ostatniego przeliczenia.',
   'nav.test': 'Zegar testowy',
   'nav.clock': 'Udawaj, że jest',
 

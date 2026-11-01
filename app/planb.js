@@ -90,8 +90,9 @@ export function contextOf(tt, { day, src, t0, exclude = null, minTransfer = 4, m
 
 // The ways as a graph: stations as nodes, legs as edges. An edge takes the colour of the best way that uses it and the
 // most trains an hour of any way that uses it. ghost: the legs of the original plan still ahead, drawn for comparison.
-// context: contextOf(), carried along for the drawing.
-export function graphOf(tt, result, { ghost = null, context = null } = {}) {
+// context: contextOf(), carried along for the drawing. active: the legs of the route being followed, drawn bold on top
+// (Navigate). me: { lat, lon, label }, the traveller's position, drawn last.
+export function graphOf(tt, result, { ghost = null, context = null, active = null, me = null } = {}) {
   const nodes = new Map(), edges = new Map();
   const node = s => {
     if (!nodes.has(s)) nodes.set(s, { st: s, name: tt.names[s], lat: tt.lat[s], lon: tt.lon[s], arr: null, rank: 3, src: s === result.src, dst: s === result.dst });
@@ -102,6 +103,11 @@ export function graphOf(tt, result, { ghost = null, context = null } = {}) {
     node(g.from); node(g.to);
     const key = 'g' + g.from + '>' + g.to;
     if (!edges.has(key)) edges.set(key, { from: g.from, to: g.to, kind: 'ghost' });
+  }
+  for (const g of active || []) {
+    node(g.from); node(g.to);
+    const key = 'a' + g.from + '>' + g.to;
+    if (!edges.has(key)) edges.set(key, { from: g.from, to: g.to, kind: 'active' });
   }
   result.options.forEach((o, idx) => {
     o.legs.forEach((l, i) => {
@@ -118,6 +124,6 @@ export function graphOf(tt, result, { ghost = null, context = null } = {}) {
   });
   for (const e of edges.values()) out.push(e);
   const dstNode = nodes.get(result.dst);
-  if (dstNode) { const best = result.options.reduce((m, o) => (o.delta < m.delta ? o : m), result.options[0]); dstNode.delta = best.delta; dstNode.band = best.band; }
-  return { nodes: [...nodes.values()], edges: out, src: result.src, dst: result.dst, t0: result.t0, baseKind: result.baseKind, context };
+  if (dstNode && result.options.length) { const best = result.options.reduce((m, o) => (o.delta < m.delta ? o : m), result.options[0]); dstNode.delta = best.delta; dstNode.band = best.band; }
+  return { nodes: [...nodes.values()], edges: out, src: result.src, dst: result.dst, t0: result.t0, baseKind: result.baseKind, context, me };
 }
