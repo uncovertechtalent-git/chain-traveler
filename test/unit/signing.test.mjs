@@ -34,8 +34,30 @@ function setup(keys) {
 }
 const b1 = makeBuild({ date: '2026-11-01' }), b2 = makeBuild({ date: '2026-11-02' });
 
-test('the shipped key list is empty until a key exists: the app behaves as before signing', () => {
-  assert.deepEqual(MANIFEST_KEYS, {});
+const livePointer = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'support', 'signed-pointer-2026-10-31.json'), 'utf8'));
+
+test('the shipped key list holds one KMS key: its id is the hash of the key, and WebCrypto takes it as ECDSA P-256', async () => {
+  const entries = Object.entries(MANIFEST_KEYS);
+  assert.equal(entries.length, 1);
+  const [kid, spki] = entries[0];
+  assert.match(kid, /^[0-9a-f]{8}$/);
+  const der = Buffer.from(spki, 'base64');
+  assert.equal(Buffer.from(await subtle.digest('SHA-256', der)).toString('hex').slice(0, 8), kid);
+  const key = await subtle.importKey('spki', der, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify']);
+  assert.equal(key.algorithm.namedCurve, 'P-256');
+});
+
+test('the pointer KMS signed in production (2026-10-31) is accepted by the shipped keys, and only as it is', async () => {
+  assert.equal(livePointer.kid in MANIFEST_KEYS, true);
+  validateManifest(livePointer);
+  await verifySignature(subtle, livePointer, MANIFEST_KEYS);
+  for (const edit of [{ sha256: 'cd'.repeat(32) }, { metaSha256: 'cd'.repeat(32) }, { bytes: livePointer.bytes + 1 }, { date: '2026-11-01' }, { built: '2026-11-01T15:33:46Z' }]) {
+    await rejects(verifySignature(subtle, { ...livePointer, ...edit }, MANIFEST_KEYS), 'signature');
+  }
+  const { sig, ...unsigned } = livePointer;
+  await rejects(verifySignature(subtle, unsigned, MANIFEST_KEYS), 'signature');
+  await rejects(verifySignature(subtle, { ...livePointer, kid: '00000000' }, MANIFEST_KEYS), 'signature');
+  await rejects(verifySignature(subtle, livePointer, { [livePointer.kid]: (await newKey()).spki }), 'signature');
 });
 
 test('golden: the browser makes the same canonical bytes as build/manifest.py, and verifies its openssl signature', async () => {

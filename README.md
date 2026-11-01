@@ -241,7 +241,7 @@ Set the repository variable `S3_DEPLOY` to `on` to enable them. They also need `
 of the `production` environment (outputs of the site-infra bootstrap and site stacks; none is a credential, they
 are secrets so that the log masks the account id).
 
-Dry run on your machine: `scripts/fetch-feed.sh && npm run test:feed` (same layout as the CDN, in `app/data/`, so `./serve.sh` behaves like production).
+Dry run on your machine: `scripts/fetch-feed.sh && npm run test:feed` (same layout as the CDN, in `app/data/`, so `./serve.sh` behaves like production). One difference: a build made on your machine is not signed, and the app refuses an unsigned manifest while `app/keys.js` lists a key (the data-age line says `signature`). To look at the app on your own build, set `MANIFEST_KEYS = {}` in `app/keys.js` for that session and do not commit it.
 
 ## Data updates on the device
 
@@ -294,6 +294,10 @@ that.
   (`python3 build/manifest.py kid-of <base64 key>`), put them into `app/keys.js`, release the shell. The other order (the key
   in the app before the pointer is signed) opens a window in which a device that updates the shell finds an unsigned
   manifest, keeps its old timetable and says `signature`.
+- **State.** Steps 1 to 3 are done: the key `d5c56622` is listed in `app/keys.js`, and the pointer of the live build carries
+  its signature (`test/support/signed-pointer-2026-10-31.json` is that pointer, signed by KMS in production; the unit test
+  checks it against the listed key). Every publish and rollback signs from here on: a build written to the bucket any
+  other way is refused by every app that has this shell.
 - **Rotate.** List the new key beside the old one, release, switch `SIGNING_KEY_ARN`, remove the old key a release later.
 - **What it does not close.** The daily build runs unattended on `main` with the data role: whoever controls that
   workflow can have a manifest signed. The signature protects against a stolen or leaked data role's S3 rights, a
