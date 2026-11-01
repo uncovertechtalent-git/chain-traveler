@@ -145,8 +145,18 @@ export default {
   'err.alreadyThere': 'Ya estás en el destino.',
   'err.noWay': 'No hay forma de llegar al destino desde aquí después de esa hora.',
 
+  // ---- live delays: marks on legs whose train has real-time data. A late train is shown as +12 min by the app
+  'rt.live': 'en directo',
+  'rt.onTime': 'puntual',
+  'rt.early': '{dur} antes',
+  'rt.cancelled': 'cancelado',
+  'rt.skipped': { one: '{n} parada omitida', other: '{n} paradas omitidas' },
+  'rt.title': 'Datos en directo del flujo en tiempo real de gtfs.de, a las {time}. Las rutas se siguen planificando con el horario.',
+  'rt.note': 'Los retrasos en directo solo cubren algunos trenes. Un tren sin marca en directo no tiene datos, lo que no significa que vaya puntual.',
+
   // ---- footer
   'foot': 'Horarios: {publisher}, {license}. {stations} estaciones, {connections} conexiones, del {first} al {last}. Solo horas previstas, sin retrasos ni obras. Comprueba el viaje en DB Navigator antes de salir.',
+  'foot.rt': 'Retrasos en directo: {publisher}, {license}, a las {time}. Las rutas se siguen planificando con el horario.',
 
   // ---- units. {n} is a number
   'unit.h': 'h',

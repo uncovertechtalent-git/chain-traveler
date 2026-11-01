@@ -154,8 +154,18 @@ export default {
   'err.alreadyThere': 'Sunteți deja la destinație.',
   'err.noWay': 'De aici nu se mai poate ajunge la destinație după acea oră.',
 
+  // ---- live delays: marks on legs whose train has real-time data. A late train is shown as +12 min by the app
+  'rt.live': 'în direct',
+  'rt.onTime': 'la timp',
+  'rt.early': 'cu {dur} mai devreme',
+  'rt.cancelled': 'anulat',
+  'rt.skipped': { one: '{n} stație sărită', few: '{n} stații sărite', other: '{n} de stații sărite' },
+  'rt.title': 'Date în direct din fluxul în timp real gtfs.de, la ora {time}. Rutele sunt în continuare planificate după orar.',
+  'rt.note': 'Întârzierile în direct acoperă doar o parte dintre trenuri. Un tren fără marcaj în direct nu are date, ceea ce nu înseamnă că circulă la timp.',
+
   // ---- footer
   'foot': 'Orar: {publisher}, {license}. Gări: {stations}, conexiuni: {connections}, perioada {first} – {last}. Doar ore planificate, fără întârzieri sau lucrări pe linie. Verificați călătoria în DB Navigator înainte de plecare.',
+  'foot.rt': 'Întârzieri în direct: {publisher}, {license}, la ora {time}. Rutele sunt în continuare planificate după orar.',
 
   // ---- units. {n} is a number
   'unit.h': 'h',

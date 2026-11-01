@@ -145,3 +145,18 @@ test('data/latest.json is never answered by the worker', async () => {
   await w.install();
   assert.equal(await w.fetch(new FakeRequest('data/latest.json')), undefined);
 });
+
+test('data/delays.json is never answered by the worker, online or offline, and never put in a cache', async () => {
+  const w = loadWorker();
+  await w.install();
+  for (const req of [new FakeRequest('data/delays.json'), moduleRequest('data/delays.json')]) {
+    assert.equal(await w.fetch(req), undefined, 'the worker leaves it to the network');
+  }
+  assert.ok(![...w.caches.map.values()].some(c => c.entries.some(e => e.url.includes('delays.json'))), 'not in any cache');
+  w.net.up = false;
+  assert.equal(await w.fetch(new FakeRequest('data/delays.json')), undefined, 'offline it is still not served from a cache');
+});
+
+test('the precache holds delays.js, the code that reads the delays', () => {
+  assert.ok(SRC.includes("'delays.js'"));
+});

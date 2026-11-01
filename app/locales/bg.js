@@ -145,8 +145,18 @@ export default {
   'err.alreadyThere': 'Вече сте на крайната гара.',
   'err.noWay': 'Оттук няма как да стигнете до крайната гара след този час.',
 
+  // ---- live delays: marks on legs whose train has real-time data. A late train is shown as +12 min by the app
+  'rt.live': 'на живо',
+  'rt.onTime': 'навреме',
+  'rt.early': '{dur} по-рано',
+  'rt.cancelled': 'отменен',
+  'rt.skipped': { one: '{n} спирка е пропусната', other: '{n} спирки са пропуснати' },
+  'rt.title': 'Данни на живо от потока в реално време на gtfs.de, към {time}. Маршрутите все още се планират по разписанието.',
+  'rt.note': 'Закъсненията на живо обхващат само част от влаковете. Влак без отметка на живо няма данни, което не означава, че е навреме.',
+
   // ---- footer
   'foot': 'Разписание: {publisher}, {license}. Гари: {stations}, връзки: {connections}, от {first} до {last}. Само планирани часове, без закъснения и ремонтни работи. Проверете пътуването в DB Navigator, преди да тръгнете.',
+  'foot.rt': 'Закъснения на живо: {publisher}, {license}, към {time}. Маршрутите все още се планират по разписанието.',
 
   // ---- units. {n} is a number
   'unit.h': 'ч',

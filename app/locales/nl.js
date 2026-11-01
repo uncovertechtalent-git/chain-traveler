@@ -145,8 +145,18 @@ export default {
   'err.alreadyThere': 'Je bent al op de bestemming.',
   'err.noWay': 'Vanaf hier is er na dat tijdstip geen manier meer om de bestemming te bereiken.',
 
+  // ---- live delays: marks on legs whose train has real-time data. A late train is shown as +12 min by the app
+  'rt.live': 'live',
+  'rt.onTime': 'op tijd',
+  'rt.early': '{dur} te vroeg',
+  'rt.cancelled': 'uitgevallen',
+  'rt.skipped': { one: '{n} halte overgeslagen', other: '{n} haltes overgeslagen' },
+  'rt.title': 'Live gegevens uit de realtime-feed van gtfs.de, stand {time}. Routes worden nog steeds op de dienstregeling gepland.',
+  'rt.note': 'Live vertragingen gelden maar voor een deel van de treinen. Een trein zonder live-markering heeft geen gegevens; dat betekent niet dat hij op tijd rijdt.',
+
   // ---- footer
   'foot': 'Dienstregeling: {publisher}, {license}. {stations} stations, {connections} verbindingen, {first} tot {last}. Alleen geplande tijden, geen vertragingen of werkzaamheden. Controleer je reis in DB Navigator voordat je vertrekt.',
+  'foot.rt': 'Live vertragingen: {publisher}, {license}, stand {time}. Routes worden nog steeds op de dienstregeling gepland.',
 
   // ---- units. {n} is a number
   'unit.h': 'u',

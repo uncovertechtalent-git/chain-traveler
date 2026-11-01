@@ -2,6 +2,7 @@ import { Timetable, fmt, INF } from './engine.js';
 import { t, th, raw, dur, minutes, num, dayLabel, errText, setLang, initialLang, onLang, applyStatic, LANGS, lang } from './i18n.js';
 import { DataStore, gunzip, describeAge } from './data-store.js';
 import { initLive } from './live.js';
+import { fetchDelays, useDelays, haveDelays, delaysInfo, clock, rtMark, rtNote, paintRt } from './delays.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -78,6 +79,7 @@ function runPlan() {
   reachCache = null;
   if (res.error) { out.innerHTML = `<div class="err">${esc(errText(res))}</div>`; if (!$('#pane-reach').hidden) drawReach(); return; }
   out.innerHTML = renderChain(res, q);
+  paintRt(out);
   if (!$('#pane-reach').hidden) drawReach();
 }
 
@@ -107,9 +109,9 @@ function renderChain(res, q) {
     }
     if (ld !== curDay) { curDay = ld; h += `<li class="wait"><b>${esc(dayName(q.day, l.dep))}</b></li>`; }
     if (l.walk) h += `<li class="leg walk">${th('chain.walk', { from: tt.names[l.from], to: tt.names[l.to] })} <span class="mute">${esc(minutes(l.arr - l.dep))}</span></li>`;
-    else h += `<li class="leg"><span class="t">${hm(l.dep)}</span> ${th('leg.fromTo', { from: tt.names[l.from], to: tt.names[l.to] })} <span class="line">${esc(l.line)}</span><span class="t">${hm(l.arr)}</span> <span class="mute">${th('leg.towards', { term: tt.names[l.term], dur: dur(l.arr - l.dep) })}</span> <button type="button" class="out" data-leg="${i}">${th('btn.out')}</button></li>`;
+    else h += `<li class="leg"><span class="t">${hm(l.dep)}</span> ${th('leg.fromTo', { from: tt.names[l.from], to: tt.names[l.to] })} <span class="line">${esc(l.line)}</span><span class="t">${hm(l.arr)}</span> <span class="mute">${th('leg.towards', { term: tt.names[l.term], dur: dur(l.arr - l.dep) })}</span> ${rtMark(tt.dateOf(l.svcDay), l.trip)} <button type="button" class="out" data-leg="${i}">${th('btn.out')}</button></li>`;
   });
-  h += `</ol><details open><summary>${th('chain.nextTrains')}</summary>`;
+  h += `</ol>${rtNote()}<details open><summary>${th('chain.nextTrains')}</summary>`;
   legs.forEach((l, i) => {
     const nxt = legs.slice(i + 1).find(x => !x.walk);
     if (!nxt) return;
@@ -231,7 +233,32 @@ function showAge(note, params = {}) {
 function renderFoot() {
   if (!tt) return;
   const f = tt.meta.feed;
-  $('#foot').textContent = t('foot', { publisher: f.publisher, license: f.license, stations: num(tt.nStations), connections: num(tt.nConn), first: tt.dateOf(0), last: tt.dateOf(tt.nDays - 1) });
+  let text = t('foot', { publisher: f.publisher, license: f.license, stations: num(tt.nStations), connections: num(tt.nConn), first: tt.dateOf(0), last: tt.dateOf(tt.nDays - 1) });
+  // The licence of the live stream asks for its attribution wherever its data is shown: while delays are in use.
+  if (haveDelays()) {
+    const d = delaysInfo();
+    text += ' ' + t('foot.rt', { publisher: d.source.publisher, license: d.source.license, time: clock(d.feedTime) });
+  }
+  $('#foot').textContent = text;
+}
+
+// ---- live delays (app/delays.js): an overlay, fetched from our own origin once a build is in use and then every few
+// minutes while the page is visible. Offline, not published, stale, malformed or made for another build, they are absent.
+const DELAYS_EVERY = 2 * 60 * 1000;
+let delaysAt = 0;
+async function refreshDelays(force = false) {
+  if (!manifest || navigator.onLine === false) return;
+  if (!force && Date.now() - delaysAt < 60 * 1000) return;
+  delaysAt = Date.now();
+  const forBuild = manifest;
+  const next = await fetchDelays({ fetch: (u, i) => fetch(u, i), base: new URL('./', location.href).href, manifest: forBuild });
+  if (manifest !== forBuild) return;    // a new build was adopted meanwhile: these delays are for the one before
+  useDelays(next);
+  showDelays();
+}
+function showDelays() {
+  paintRt();
+  renderFoot();
 }
 
 function fillDates(wantedIso) { fillDateSelect($('#date'), wantedIso); }
@@ -255,6 +282,8 @@ function adopt(cur, next) {
     : { iso: state.date, src: state.src, dst: state.dst, via: state.via, dep: '' };
   tt = next;
   manifest = cur.manifest;
+  useDelays(null);    // trip numbers are per build: delays made for the one before do not apply
+  delaysAt = 0;
   reachCache = null;
   lastPlan = null;
   fillDates(keep.iso);
@@ -268,6 +297,7 @@ function adopt(cur, next) {
   showAge('');
   runPlan();
   if (!$('#pane-deps').hidden) drawDeps();
+  refreshDelays(true);
 }
 
 async function useBuild(cur) {
@@ -382,8 +412,15 @@ async function start() {
   }
   store = new DataStore({ caches: self.caches, fetch: (u, i) => fetch(u, i), subtle: crypto.subtle, base: new URL('./', location.href).href });
   $('#retry').onclick = () => { status.textContent = t('status.loading'); $('#retry').hidden = true; checkForUpdate(); };
-  window.addEventListener('online', checkForUpdate);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastCheck > SIX_HOURS) checkForUpdate(); });
+  window.addEventListener('online', () => { checkForUpdate(); refreshDelays(); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (Date.now() - lastCheck > SIX_HOURS) checkForUpdate();
+    refreshDelays();
+    showDelays();
+  });
+  // Every two minutes while visible: new delays; and what has grown stale (15 minutes) disappears, offline too.
+  setInterval(() => { if (document.visibilityState === 'visible') { refreshDelays(); showDelays(); } }, DELAYS_EVERY);
 
   let cur = null;
   try { cur = await store.load(); } catch (e) { status.textContent = t('status.readFailed', { message: e.message }); }

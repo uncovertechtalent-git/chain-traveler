@@ -8,10 +8,12 @@
 //
 // Data: the verified timetable lives in Cache Storage under names the data store controls. This worker does not
 // cache it. Dated build files (data/<date>/...) are served cache-first if the store has them, data/latest.json is
-// never touched, so the update check always sees the live manifest.
+// never touched, so the update check always sees the live manifest. Nor is data/delays.json (the live delays, replaced
+// every five minutes): anything under data/ that is not a dated build goes straight to the network, so a delay is never
+// older than the CDN's half minute and never answered from a cache when the device is offline.
 const VERSION = '__SHELL_VERSION__';
 const SHELL_CACHE = 'ct-shell-' + VERSION;
-const SHELL = ['./', 'index.html', 'app.js', 'engine.js', 'data-store.js', 'planb.js', 'graph.js', 'live.js', 'i18n.js', 'style.css', 'manifest.webmanifest', 'icon.svg',
+const SHELL = ['./', 'index.html', 'app.js', 'engine.js', 'data-store.js', 'planb.js', 'graph.js', 'live.js', 'delays.js', 'i18n.js', 'style.css', 'manifest.webmanifest', 'icon.svg',
   'locales/en.js', 'locales/pl.js', 'locales/ru.js', 'locales/ro.js', 'locales/bg.js', 'locales/uk.js', 'locales/tr.js', 'locales/nl.js', 'locales/fr.js', 'locales/es.js'];
 const DATED_BUILD = /\/data\/\d{4}-\d{2}-\d{2}\//;
 // Lookups in our own caches ignore Vary. The CDN answers every file with "Vary: Origin", and Chrome adds an Origin

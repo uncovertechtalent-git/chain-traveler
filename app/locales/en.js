@@ -16,6 +16,7 @@
 //  - "ways on": the possible ways to continue the journey from where you are.
 //  - trains an hour: how many trains per hour serve a leg (frequency).
 //  - late / much later: arriving after the time the plan promised. "on plan": arriving when planned or close to it.
+//  - live: from real-time data (what the train is doing now), as opposed to the planned timetable. A small word on a mark.
 //  - time-of-day strings such as 06:00 and the unit h (hours) and min (minutes) are formatted by the app.
 export default {
   // ---- header, status, language
@@ -163,8 +164,18 @@ export default {
   'err.alreadyThere': 'You are already at the target.',
   'err.noWay': 'No way on to the target from here after that time.',
 
+  // ---- live delays: marks on legs whose train has real-time data. A late train is shown as +12 min by the app
+  'rt.live': 'live',
+  'rt.onTime': 'on time',
+  'rt.early': '{dur} early',
+  'rt.cancelled': 'cancelled',
+  'rt.skipped': { one: '{n} stop skipped', other: '{n} stops skipped' },
+  'rt.title': 'Live data from the gtfs.de realtime stream, as of {time}. Routes are still planned on the timetable.',
+  'rt.note': 'Live delays cover only some trains. A train without a live mark has no data, which does not mean it is on time.',
+
   // ---- footer
   'foot': 'Timetable: {publisher}, {license}. {stations} stations, {connections} connections, {first} to {last}. Planned times only, no delays or engineering works. Check the trip in DB Navigator before you travel.',
+  'foot.rt': 'Live delays: {publisher}, {license}, as of {time}. Routes are still planned on the timetable.',
 
   // ---- units. {n} is a number
   'unit.h': 'h',

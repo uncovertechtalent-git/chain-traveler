@@ -147,8 +147,18 @@ export default {
   'err.alreadyThere': 'Zaten hedefinizdesiniz.',
   'err.noWay': 'Buradan, bu saatten sonra hedefe devam edecek bir yol yok.',
 
+  // ---- live delays: marks on legs whose train has real-time data. A late train is shown as +12 min by the app
+  'rt.live': 'canlı',
+  'rt.onTime': 'zamanında',
+  'rt.early': '{dur} erken',
+  'rt.cancelled': 'iptal',
+  'rt.skipped': { one: '{n} durak atlanıyor', other: '{n} durak atlanıyor' },
+  'rt.title': 'gtfs.de gerçek zamanlı akışından canlı veri, saat {time}. Güzergâhlar yine de tarifeye göre planlanır.',
+  'rt.note': 'Canlı gecikme bilgisi yalnızca bazı trenler için var. Canlı işareti olmayan trenin verisi yoktur; bu, zamanında olduğu anlamına gelmez.',
+
   // ---- footer
   'foot': 'Sefer saatleri: {publisher}, {license}. {stations} istasyon, {connections} bağlantı, {first} – {last}. Yalnızca planlanan saatler; gecikmeler ve yol çalışmaları yok. Yola çıkmadan önce yolculuğu DB Navigator uygulamasında kontrol edin.',
+  'foot.rt': 'Canlı gecikmeler: {publisher}, {license}, saat {time}. Güzergâhlar yine de tarifeye göre planlanır.',
 
   // ---- units. {n} is a number
   'unit.h': 'sa',

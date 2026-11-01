@@ -3,6 +3,7 @@
 import { t, th, raw, dur, minutes, dist, errText } from './i18n.js';
 import { plan, graphOf, contextOf, GOOD_MIN, LATE_MIN } from './planb.js';
 import { svgOf } from './graph.js';
+import { rtMark, rtNote, paintRt } from './delays.js';
 
 export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSelect, minTransfer }) {
   const pSrc = picker($('#lsrc'), () => { forget(); run(); });
@@ -30,7 +31,7 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
   function legLines(tt, o) {
     return '<ol class="mini">' + o.legs.map((l, i) => (l.walk
       ? `<li class="walk">${th('chain.walk', { from: tt.names[l.from], to: tt.names[l.to] })} <span class="mute">${minutes(l.arr - l.dep)}</span></li>`
-      : `<li><span class="t">${at(l.dep)}</span> ${th('leg.fromTo', { from: tt.names[l.from], to: tt.names[l.to] })} <span class="line">${esc(l.line)}</span><span class="t">${at(l.arr)}</span> <span class="mute">${esc(t('unit.perHour', { n: o.perLeg[i] }))}</span></li>`)).join('') + '</ol>';
+      : `<li><span class="t">${at(l.dep)}</span> ${th('leg.fromTo', { from: tt.names[l.from], to: tt.names[l.to] })} <span class="line">${esc(l.line)}</span><span class="t">${at(l.arr)}</span> <span class="mute">${esc(t('unit.perHour', { n: o.perLeg[i] }))}</span> ${rtMark(tt.dateOf(l.svcDay), l.trip)}</li>`)).join('') + '</ol>';
   }
 
   function optionHtml(tt, o, baseKind) {
@@ -63,9 +64,10 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
     deps.innerHTML = list.length
       ? `<h3>${th('live.depsTitle', { station: tt.names[src], time: hm(t0) })}</h3>${list[0].dep >= 1440 ? `<div class="err">${th('live.noMoreToday', { station: tt.names[src], time: hm(t0) })}</div>` : ''}<p class="note">${th('live.tick')}${unlisted ? ` ${th('live.unlisted', { n: unlisted })}` : ''}</p><ul class="outs">${list.map(d => {
         const k = tt.tripKey(d.svcDay, d.trip);
-        return `<li><label class="outl"><input type="checkbox" data-k="${k}"${out.has(k) ? ' checked' : ''}> <span class="t">${at(d.dep)}</span> <span class="line">${esc(d.line)}</span> ${th('dep.towards', { term: tt.names[d.term] })}</label></li>`;
+        return `<li><label class="outl"><input type="checkbox" data-k="${k}"${out.has(k) ? ' checked' : ''}> <span class="t">${at(d.dep)}</span> <span class="line">${esc(d.line)}</span> ${th('dep.towards', { term: tt.names[d.term] })} ${rtMark(tt.dateOf(d.svcDay), d.trip)}</label></li>`;
       }).join('')}</ul>`
       : '';
+    paintRt(deps);
 
     const result = plan(tt, { day, src, dst, t0, plannedArr: planned, exclude: out, minTransfer: minTransfer() });
     if (result.error) { res.innerHTML = `<div class="err">${esc(errText(result))}</div>`; return; }
@@ -78,7 +80,8 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
     const paint = context => {
       const model = graphOf(tt, result, { ghost, context });
       const svg = svgOf(model, { width: drawnWidth, height: Math.round(drawnWidth * (drawnWidth < 500 ? 1.15 : 0.72)), label: t('graph.label', { from: tt.names[src], to: tt.names[dst] }), min: t('unit.min') });
-      res.innerHTML = `<p class="lead2">${esc(lead)}</p>${svg}${legend(result.baseKind, !!context && context.nodes.length > 0)}<ol class="opts">${result.options.map(o => optionHtml(tt, o, result.baseKind)).join('')}</ol>`;
+      res.innerHTML = `<p class="lead2">${esc(lead)}</p>${svg}${legend(result.baseKind, !!context && context.nodes.length > 0)}${rtNote()}<ol class="opts">${result.options.map(o => optionHtml(tt, o, result.baseKind)).join('')}</ol>`;
+      paintRt(res);
     };
     // The network around you, as quiet background: where else you could get to, as far as the way on takes and a bit
     // more. It needs a scan of its own, so the ways are drawn first and the network follows; a run that was replaced
