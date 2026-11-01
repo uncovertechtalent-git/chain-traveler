@@ -13,7 +13,7 @@ Licence: MIT. Timetable data: gtfs.de, data provided by DELFI e.V., CC BY 4.0 (s
 | Chain | Earliest chain of trains from a start to a target station after a time, on a chosen date. Optional stop-over with a minimum stay: it arrives at the stop-over as early as possible, waits out the stay, then chains onward as early as possible. Walks between nearby stations, tight changes flagged, and the next trains at every stop so you can swap the plan on the day. |
 | Reach map | Every station as a dot, coloured by how soon you can be there from the start. Click a dot to chain a trip there. |
 | Departures | The next trains at any station after a time. |
-| Plan B | "My train is out." From where you are, now, to where you are going: the ways on, each set against your plan, drawn as a graph (stations at their real positions, green, amber and red for how late, line thickness for trains an hour) and listed with their changes and tightest change. Press "This train is out" on a leg of a chain to start from there, or open the tab and say where you are. |
+| Plan B | "My train is out." From where you are, now, to where you are going: the ways on, each set against your plan, drawn as a graph (stations at their real positions, green, amber and red for how late, line thickness for trains an hour) and listed with their changes and tightest change. Press "This train is out?" on a leg of a chain to start from there, or open the tab and say where you are. |
 
 ## Run it
 
