@@ -119,6 +119,20 @@ export class Timetable {
     return best;
   }
 
+  // The stations nearest to a position in degrees, nearest first, as { station, km } (great-circle). Only stations a
+  // train leaves from; none farther than maxKm. Bad input gives an empty list.
+  nearby({ lat, lon, limit = 4, maxKm = 40 }) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return [];
+    const rad = Math.PI / 180, cosLat = Math.cos(lat * rad), out = [];
+    for (let s = 0; s < this.nStations; s++) {
+      if (!this.degree[s]) continue;
+      const a = Math.sin((this.lat[s] - lat) * rad / 2) ** 2 + cosLat * Math.cos(this.lat[s] * rad) * Math.sin((this.lon[s] - lon) * rad / 2) ** 2;
+      const km = 12742 * Math.asin(Math.sqrt(a));
+      if (km <= maxKm) out.push({ station: s, km });
+    }
+    return out.sort((x, y) => x.km - y.km).slice(0, limit);
+  }
+
   // A trip runs once per service day; a cancellation hits one run. Runs are keyed by service day and trip number.
   tripKey(svcDay, trip) { return svcDay * this.nTrips + trip; }
 

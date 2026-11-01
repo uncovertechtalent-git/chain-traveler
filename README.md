@@ -13,7 +13,7 @@ Licence: MIT. Timetable data: gtfs.de, data provided by DELFI e.V., CC BY 4.0 (s
 | Chain | Earliest chain of trains from a start to a target station after a time, on a chosen date. Optional stop-over with a minimum stay: it arrives at the stop-over as early as possible, waits out the stay, then chains onward as early as possible. Walks between nearby stations, tight changes flagged, and the next trains at every stop so you can swap the plan on the day. |
 | Reach map | Every station as a dot, coloured by how soon you can be there from the start. Click a dot to chain a trip there. |
 | Departures | The next trains at any station after a time. |
-| Plan B | "My train is out." From where you are, now, to where you are going: the ways on, each set against your plan, drawn as a graph (stations at their real positions, green, amber and red for how late, line thickness for trains an hour) and listed with their changes and tightest change. Press "This train is out?" on a leg of a chain to start from there, or open the tab and say where you are. |
+| Plan B | "My train is out." From where you are, now, to where you are going: the ways on, each set against your plan, drawn as a graph (stations at their real positions, green, amber and red for how late, line thickness for trains an hour) and listed with their changes and tightest change. Press "This train is out?" on a leg of a chain to start from there, or open the tab and say where you are, by name or with "Use my location". |
 
 ## Run it
 
@@ -74,8 +74,11 @@ timetable on the device, in tens of milliseconds.
 4. **Not a probability.** The feed has planned times only: no delays, no cancellations. "Trains an hour" is the
    structure of the timetable, not the chance that a train runs. A real "how likely" needs live data (gtfs.de offers
    GTFS-RT as a separate service), which this does not use. Which trains are out is what you tick.
-5. **Where you are.** You pick the station. Using the device's location needs a change to the site's
-   Permissions-Policy and the browser's permission, and is a separate step.
+5. **Where you are.** Pick the station, or press "Use my location": the device is asked for its position once (no
+   tracking, nothing stored or sent), the nearest stations that have trains within 40 km are listed with their distance,
+   the nearest is filled in, and the date and time are set to now. It works offline, from the device's own positioning.
+   The browser asks for permission, and the site's Permissions-Policy has to allow it (`geolocation=(self)`, set in
+   site-infra). Times after midnight of the chosen date carry "+1".
 
 ## Hosting and data pipeline
 
@@ -145,7 +148,7 @@ next step if the threat model ever needs it.
 
 | Suite | Runs | Covers |
 |---|---|---|
-| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG. Deterministic, no network. |
+| `test/unit/` | on every pull request (`npm test`) | The engine on a small in-memory timetable (`test/support/fixture.mjs`): earliest chains, change times, footpaths, stop-overs, midnight crossings, days a trip does not run, departures, station search, the stations nearest to a position. The update flow (`data-store.test.mjs`) against a fake Cache Storage and CDN: first launch, nothing new, update and swap order, corrupted, truncated and oversized downloads, a second file that fails, offline, a full disk, a failing pointer write, a damaged cache entry, rollback, concurrent calls. Guards on the shell (`shell.test.mjs`): the precache list matches the files, no inline script or style (strict CSP), no external URL. The service worker against a cache that honours `Vary` (`sw.test.mjs`). Plan B on a small corridor timetable (`planb.test.mjs`): runs marked out, trains an hour, bands, the ways and their order, the graph model and the SVG. Deterministic, no network. |
 | `test/build/` | on every pull request (Python `unittest`) | The manifest and its checks (changed byte, truncated or missing file, malformed fields), retention of three builds, and `scripts/ci/deploy-shell.sh` and `publish-data.sh` against a fake AWS CLI: the shell deploy never writes under `data/`, the publish never writes outside it, the pointer is written last, a same-day build with other bytes is refused, a damaged upload leaves the old pointer. |
 | `test/feed/` | before a timetable build is published, and locally after `scripts/fetch-feed.sh` | The engine on the real national timetable: size and age of the window, named chains (Wolfsburg to Leipzig and München, München to Wolfsburg via Nürnberg, Wolfsburg to München via Leipzig), the Leipzig footpath, a train past midnight, station search, and Plan B with the planned first train out (ordered ways, none of them the cancelled run, well under a second). Days come from the data, bounds are generous ceilings. |
 
@@ -155,6 +158,15 @@ next step if the threat model ever needs it.
   "Nahverkehr") and need a regional cut; that is a separate step.
 - Weekend gaps are real data, not bugs: some stations have no regional service on Saturdays or Sundays.
 - No live delays. gtfs.de offers GTFS-RT as a separate service.
+
+## Privacy
+
+The app has no account, no analytics script and no request to anyone but its own origin. It keeps in your browser only
+the timetable and your last inputs. The position that Plan B reads stays on the device. The CDN that serves the files
+keeps access logs: date and time, edge location, path, status, bytes, referrer, User-Agent and the country CloudFront
+derives, and never an IP address, cookie or query string. Raw logs are deleted after 30 days; what is kept are counts
+(page views, countries, bots by name). The setup is public in
+[site-infra](https://github.com/uncovertechtalent-git/site-infra).
 
 ## Security
 

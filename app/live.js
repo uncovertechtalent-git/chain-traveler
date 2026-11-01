@@ -15,6 +15,8 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
   let drawnWidth = 0;      // the width the graph was last drawn at
 
   const forget = () => { out = new Set(); ghost = null; };
+  // A time of day, with +1 after midnight of the chosen date, so a train on the next day is not read as one today.
+  const at = m => hm(m) + (m >= 1440 ? ` +${Math.floor(m / 1440)}` : '');
   const nowHm = () => new Date().toLocaleTimeString('sv-SE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit' });
 
   // What the chip says. Against a plan: on plan, early, late, much later. Without one: the best way and how far the others trail it.
@@ -30,14 +32,14 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
   function legLines(tt, o) {
     return '<ol class="mini">' + o.legs.map((l, i) => (l.walk
       ? `<li class="walk">Walk ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="mute">${l.arr - l.dep} min</span></li>`
-      : `<li><span class="t">${hm(l.dep)}</span> ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="line">${esc(l.line)}</span><span class="t">${hm(l.arr)}</span> <span class="mute">${o.perLeg[i]}/h</span></li>`)).join('') + '</ol>';
+      : `<li><span class="t">${at(l.dep)}</span> ${esc(tt.names[l.from])} to ${esc(tt.names[l.to])} <span class="line">${esc(l.line)}</span><span class="t">${at(l.arr)}</span> <span class="mute">${o.perLeg[i]}/h</span></li>`)).join('') + '</ol>';
   }
 
   function optionHtml(tt, o, baseKind) {
-    const meta = [`leave ${hm(o.dep)}`, `${o.changes} change${o.changes === 1 ? '' : 's'}`];
+    const meta = [`leave ${at(o.dep)}`, `${o.changes} change${o.changes === 1 ? '' : 's'}`];
     if (o.tightest !== null) meta.push(`tightest change ${o.tightest} min`);
     meta.push(`thinnest leg ${o.thinnest} train${o.thinnest === 1 ? '' : 's'} an hour`);
-    return `<li class="opt ${o.band}"><div class="head"><b class="t">${hm(o.arr)}</b> arrive <span class="chip ${o.band}">${esc(chipText(o, baseKind))}</span>${o.tags.map(t => ` <span class="tag">${esc(t)}</span>`).join('')}</div><div class="mute">${esc(meta.join(' · '))}</div>${legLines(tt, o)}</li>`;
+    return `<li class="opt ${o.band}"><div class="head"><b class="t">${at(o.arr)}</b> arrive <span class="chip ${o.band}">${esc(chipText(o, baseKind))}</span>${o.tags.map(t => ` <span class="tag">${esc(t)}</span>`).join('')}</div><div class="mute">${esc(meta.join(' · '))}</div>${legLines(tt, o)}</li>`;
   }
 
   const legend = baseKind => `<p class="legend2"><span class="chip good">green</span> up to ${GOOD_MIN} min after ${baseKind === 'plan' ? 'your plan' : 'the best way'} <span class="chip mid">amber</span> up to ${LATE_MIN} min <span class="chip bad">red</span> beyond that. Line thickness: trains an hour on that leg, from one (thin) to four or more (thick).${baseKind === 'plan' ? ' The dotted line: the plan you had.' : ''}</p>`;
@@ -60,9 +62,9 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
     const listed = new Set(list.map(d => tt.tripKey(d.svcDay, d.trip)));
     const unlisted = [...out].filter(k => !listed.has(k)).length;
     deps.innerHTML = list.length
-      ? `<h3>Trains from ${esc(tt.names[src])} after ${hm(t0)}</h3><p class="note">Tick the ones that are out.${unlisted ? ` ${unlisted} more marked out earlier, not in this list.` : ''}</p><ul class="outs">${list.map(d => {
+      ? `<h3>Trains from ${esc(tt.names[src])} after ${hm(t0)}</h3>${list[0].dep >= 1440 ? `<div class="err">No train leaves ${esc(tt.names[src])} on this date after ${hm(t0)} in the timetable. These are on the next day (+1).</div>` : ''}<p class="note">Tick the ones that are out.${unlisted ? ` ${unlisted} more marked out earlier, not in this list.` : ''}</p><ul class="outs">${list.map(d => {
         const k = tt.tripKey(d.svcDay, d.trip);
-        return `<li><label class="outl"><input type="checkbox" data-k="${k}"${out.has(k) ? ' checked' : ''}> <span class="t">${hm(d.dep)}</span> <span class="line">${esc(d.line)}</span> towards ${esc(tt.names[d.term])}</label></li>`;
+        return `<li><label class="outl"><input type="checkbox" data-k="${k}"${out.has(k) ? ' checked' : ''}> <span class="t">${at(d.dep)}</span> <span class="line">${esc(d.line)}</span> towards ${esc(tt.names[d.term])}</label></li>`;
       }).join('')}</ul>`
       : '';
 
@@ -70,14 +72,56 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
     if (result.error) { res.innerHTML = `<div class="err">${esc(result.error)}</div>`; return; }
     const first = result.options[0];
     const lead = result.baseKind === 'plan'
-      ? `Your plan arrived at ${hm(result.base)}. The best way on now arrives at ${hm(first.arr)}${first.delta > 0 ? `, ${dur(first.delta)} later` : ''}.`
-      : `No planned arrival given, so the best way on (arriving ${hm(first.arr)}) is the yardstick.`;
+      ? `Your plan arrived at ${at(result.base)}. The best way on now arrives at ${at(first.arr)}${first.delta > 0 ? `, ${dur(first.delta)} later` : ''}.`
+      : `No planned arrival given, so the best way on (arriving ${at(first.arr)}) is the yardstick.`;
     const model = graphOf(tt, result, { ghost });
     // The graph is drawn at the width it is shown at, so its text keeps its size on a phone; the box is taller there.
     drawnWidth = Math.max(300, Math.min(720, res.clientWidth || 720));
     const svg = svgOf(model, { width: drawnWidth, height: Math.round(drawnWidth * (drawnWidth < 500 ? 1.15 : 0.72)), label: `Ways from ${tt.names[src]} to ${tt.names[dst]}` });
     res.innerHTML = `<p class="lead2">${esc(lead)}</p>${svg}${legend(result.baseKind)}<ol class="opts">${result.options.map(o => optionHtml(tt, o, result.baseKind)).join('')}</ol>`;
   }
+
+  // "Use my location": one position reading from the device (no tracking, nothing stored, nothing sent), the nearest
+  // stations that have trains, and the nearest filled in as "I am at", with the date and time set to now.
+  const where = $('#lwhere'), locateBtn = $('#llocate');
+  const say = html => { where.innerHTML = html; };
+  const away = km => (km < 1 ? `${Math.max(10, Math.round(km * 100) * 10)} m` : `${km.toFixed(1)} km`);
+  const choose = s => { forget(); pSrc.set(s); run(); };
+  const FAILS = {
+    1: 'Location is not allowed for this page. Allow it for this site in the browser settings, or pick the station by name.',
+    2: 'The device could not work out where you are. Pick the station by name.',
+    3: 'Finding your position took too long. Try again, or pick the station by name.',
+  };
+
+  function located(pos) {
+    locateBtn.disabled = false;
+    const tt = getTt();    // read now: the timetable may have been replaced while the device was thinking
+    const { latitude: lat, longitude: lon, accuracy } = pos.coords;
+    const near = tt.nearby({ lat, lon, limit: 4, maxKm: 40 });
+    if (!near.length) { say('No station with regional trains within 40 km of you. Pick the station by name.'); return; }
+    fillDateSelect($('#ldate'), today());
+    $('#lt0').value = nowHm();
+    choose(near[0].station);
+    const rough = accuracy > 1500 ? ` The position is only accurate to about ${Math.round(accuracy / 1000)} km, so check the station.` : '';
+    const others = near.slice(1).map(x => `<button type="button" class="near" data-st="${x.station}">${esc(tt.names[x.station])}, ${away(x.km)}</button>`).join(' ');
+    say(`You are near <b>${esc(tt.names[near[0].station])}</b> (${away(near[0].km)}). Date and time set to now.${rough} Your position stays on this device.${others ? ` Not here? ${others}` : ''}`);
+  }
+
+  function locate() {
+    if (!getTt()) return;
+    if (!navigator.geolocation) { say('This browser cannot tell where you are. Pick the station by name.'); return; }
+    locateBtn.disabled = true;
+    say('Looking for your position...');
+    navigator.geolocation.getCurrentPosition(located, err => {
+      locateBtn.disabled = false;
+      say(esc(FAILS[err && err.code] || FAILS[2]));
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+  }
+  locateBtn.addEventListener('click', locate);
+  where.addEventListener('click', ev => {
+    const b = ev.target.closest('button.near');
+    if (b) { choose(+b.dataset.st); say(''); }
+  });
 
   $('#ldeps').addEventListener('change', ev => {
     const box = ev.target.closest('input[type=checkbox]');
@@ -116,6 +160,7 @@ export function initLive({ $, esc, picker, getTt, hm, toMin, today, fillDateSele
     onTimetable() {
       const tt = getTt();
       forget();
+      say('');    // the candidate buttons carry station numbers of the old timetable
       if ($('#ldate').options.length) fillDateSelect($('#ldate'), dayIso);
       pSrc.set($('#lsrc').value ? tt.find($('#lsrc').value) : -1);
       pDst.set($('#ldst').value ? tt.find($('#ldst').value) : -1);
