@@ -6,7 +6,9 @@ import { plan, graphOf, contextOf, GOOD_MIN, LATE_MIN } from './planb.js';
 import { svgOf } from './graph.js';
 import { zoomView, showMap } from './zoomview.js';
 
-export function initLive({ $, esc, getTt, hm, toMin, minTransfer, place, setPlace, onFollow }) {
+// minTransfer(): the minimum change to scan with, what the page says plus what the traveller brings (app/bring.js);
+// bringNote(): the general notes for what is brought, as HTML, or '' when nothing is.
+export function initLive({ $, esc, getTt, hm, toMin, minTransfer, bringNote = () => '', place, setPlace, onFollow }) {
   let out = new Set();     // runs marked as out (engine tripKey values)
   let ghost = null;        // the legs of the original plan still ahead, when we came from the chain view
   let plannedClock = null; // the arrival that plan promised, as a time of day in minutes; none unless we came from a chain or Navigate
@@ -83,7 +85,7 @@ export function initLive({ $, esc, getTt, hm, toMin, minTransfer, place, setPlac
       const model = graphOf(tt, result, { ghost, context });
       const width = drawnWidth, height = Math.round(width * (width < 500 ? 1.15 : 0.72));
       const label = t('graph.label', { from: tt.names[src], to: tt.names[dst] }), min = t('unit.min');
-      const html = `<p class="lead2">${esc(lead)}</p><div class="zslot"></div>${legend(result.baseKind, !!context && context.nodes.length > 0)}<ol class="opts">${result.options.map((o, i) => optionHtml(tt, o, result.baseKind, i)).join('')}</ol>`;
+      const html = `<p class="lead2">${esc(lead)}</p><div class="zslot"></div>${legend(result.baseKind, !!context && context.nodes.length > 0)}<ol class="opts">${result.options.map((o, i) => optionHtml(tt, o, result.baseKind, i)).join('')}</ol>${bringNote()}`;
       const fresh = setHtml(res, html);
       zoom.show({ width, height, draw: view => svgOf(model, { width, height, label, min, basemap: showMap(), view }) });
       if (fresh) res.querySelector('.zslot').replaceWith(zoom.el);

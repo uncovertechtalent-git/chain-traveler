@@ -131,7 +131,9 @@ export function fromStored(tt, o) {
 // ---- the card
 const STORE = 'ct-nav';
 
-export function initNavigate({ $, getTt, hm, toMin, today, minTransfer, onWays }) {
+// minTransfer(): the minimum change to scan with, what the page says plus what the traveller brings (app/bring.js);
+// bringNote(): the general notes for what is brought, as HTML, or '' when nothing is.
+export function initNavigate({ $, getTt, hm, toMin, today, minTransfer, bringNote = () => '', onWays }) {
   const card = $('#navcard'), wrap = $('#navwrap');
   // The card is written again whenever its words change; the graph keeps a place of its own between the two halves, so a
   // finger that is moving the map is not cut off by the clock ticking.
@@ -205,7 +207,7 @@ export function initNavigate({ $, getTt, hm, toMin, today, minTransfer, onWays }
   function paintGraph(tt, n, fresh) {
     const w = where(nav.legs, n);
     const next = nav.legs.slice(w.phase === 'riding' || w.phase === 'walking' ? w.i + 1 : w.i).find(l => !l.walk);
-    const key = [nav.day, nav.recalcs, nav.out.size, next ? legKey(next) : 'none', Math.floor(n / 3)].join('|');
+    const key = [nav.day, nav.recalcs, nav.out.size, next ? legKey(next) : 'none', Math.floor(n / 3), minTransfer()].join('|');
     if (shown.key !== key) shown = { key, what: whatIf(tt, nav, n, minTransfer()) };
     const what = shown.what;
     const result = what && !what.result.error ? what.result : { options: [], src: nav.legs[0].from, dst: nav.dst, t0: n, baseKind: 'plan' };
@@ -265,6 +267,7 @@ export function initNavigate({ $, getTt, hm, toMin, today, minTransfer, onWays }
       }
     }
     bottom += `<div class="navbtns"><button type="button" data-nav="track">${th(tracking ? 'nav.untrack' : 'nav.track')}</button> <button type="button" data-nav="ways">${th('nav.ways')}</button></div>`;
+    bottom += bringNote();
     bottom += `<p class="note">${trackNote ? th(trackNote.key, trackNote.params) : th('nav.privacy')}</p>`;
     if (top !== lastTop) { topEl.innerHTML = top; lastTop = top; }
     if (bottom !== lastBottom) { bottomEl.innerHTML = bottom; lastBottom = bottom; }

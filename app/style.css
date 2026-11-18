@@ -181,3 +181,9 @@ table.deps .dl{width:4.6rem}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .themebtn .sun{display:block}:root:not([data-theme="light"]) .themebtn .moon{display:none}}
 :root[data-theme="dark"] .themebtn .sun{display:block}
 :root[data-theme="dark"] .themebtn .moon{display:none}
+/* what the traveller brings: the line under the bar, and the general notes under the results (no rule for a particular train) */
+.bringhint{margin:8px 0 0}
+.bringnote{margin:14px 0 0;padding:8px 12px;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;font-size:.85rem;color:var(--muted)}
+.bringnote p{margin:0 0 4px}
+.bringnote ul{margin:0;padding-left:1.1rem}
+.bringnote li{margin:2px 0}

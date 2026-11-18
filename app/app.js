@@ -6,6 +6,7 @@ import { initLive } from './live.js';
 import { initNavigate } from './navigate.js';
 import { berlinClock, tick as clockStep, atLaunch, onReturn, migrate } from './here.js';
 import { initTheme } from './theme.js';
+import { loadItem, saveItem, normalizeItem, changeTime, extraMin, noteKeys } from './bring.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -15,6 +16,7 @@ const DEFAULTS = { date: '', src: '', dst: '', via: '', t0: '06:00', stay: 180, 
 let tt, state, store, manifest, uiReady = false, lastCheck = 0, lastPlan = null, reachCache = null, live = null, nav = null;
 let fromSource = '';      // where "I am at" came from: 'gps' (the device said so), 'manual' (a station was picked) or ''
 let lastLocate = 0;       // when the device was last asked for the position, to keep the silent asks apart
+let bring = 'none';       // what the traveller brings: 'none', 'bike', 'folding' or 'scooter' (app/bring.js); kept on the device
 
 function loadState() {
   let raw = null;
@@ -54,11 +56,30 @@ function picker(input, onPick) {
 
 let pSrc, pDst, pVia;
 
+// The minimum change every scan is asked for: the box "Minimum change" plus what the traveller brings. This is the one
+// place that adds the two; the chain, the reach map, Plan B and Navigate all take their change time from here.
+const transferMin = () => changeTime($('#tr').value, bring);
+
 function currentInputs() {
   return {
     day: +$('#date').value, src: pSrc.get(), dst: pDst.get(), via: pVia.get(),
-    t0: toMin($('#t0').value), stay: Math.max(0, +$('#stay').value || 0), tr: Math.max(0, +$('#tr').value || 0),
+    t0: toMin($('#t0').value), stay: Math.max(0, +$('#stay').value || 0), tr: transferMin(),
   };
+}
+
+// What the traveller brings: the box in the bar, the line under it (the total change time, so it is drawn again when the
+// box "Minimum change" changes), and the note under the reach map. The notes under the other results are drawn with them.
+function paintBring() {
+  $('#bring').value = bring;
+  const hint = $('#bringhint');
+  hint.hidden = bring === 'none';
+  hint.textContent = bring === 'none' ? '' : t('bring.hint', { extra: minutes(extraMin(bring)), total: minutes(transferMin()) });
+  $('#reach-bring').innerHTML = bringNote();
+}
+function bringNote() {
+  const keys = noteKeys(bring);
+  if (!keys.length) return '';
+  return `<div class="bringnote" role="note" aria-label="${esc(t('bring.note.label'))}"><p>${th('bring.note.lead')}</p><ul>${keys.map(k => `<li>${th(k)}</li>`).join('')}</ul></div>`;
 }
 
 function persist() {
@@ -199,7 +220,7 @@ function renderChain(res, q) {
     }
     h += '</ul></div>';
   });
-  return h + '</details>';
+  return h + '</details>' + bringNote();
 }
 
 // ---- reach map ----
@@ -272,9 +293,10 @@ function drawDeps() {
   if (s < 0) { out.innerHTML = `<p class="note">${th('deps.pick')}</p>`; return; }
   const day = +$('#date').value, t = toMin($('#t0').value);
   const deps = tt.departures({ day, station: s, t, limit: 14 });
-  out.innerHTML = deps.length
+  const list = deps.length
     ? `<table class="deps"><tr><th class="dt">${th('deps.th.departs')}</th><th class="dl">${th('deps.th.line')}</th><th>${th('deps.th.towards')}</th><th>${th('deps.th.next')}</th></tr>${deps.map(d => `<tr><td class="t">${hm(d.dep)}${d.dep >= 1440 ? ' <span class="mute">' + esc(dayName(day, d.dep)) + '</span>' : ''}</td><td><span class="line">${esc(d.line)}</span></td><td>${esc(tt.names[d.term])}</td><td class="mute">${esc(tt.names[d.next])} ${hm(d.arr)}</td></tr>`).join('')}</table>`
     : `<p class="note">${th('deps.none')}</p>`;
+  out.innerHTML = list + (deps.length ? bringNote() : '');
 }
 
 // ---- tabs ----
@@ -384,16 +406,23 @@ function initUi() {
   pSrc = picker($('#src'), () => { fromSource = 'manual'; changedPlace(); });
   pDst = picker($('#dst'), changedPlace);
   pVia = picker($('#via'), () => renderTab());
-  const minTransfer = () => Math.max(0, +$('#tr').value || 0);
-  live = initLive({ $, esc, getTt: () => tt, hm, toMin, minTransfer, place, setPlace, onFollow: o => nav.start(o) });
-  nav = initNavigate({ $, getTt: () => tt, hm, toMin, today: berlinToday, minTransfer, onWays: a => { showTab('live', false); live.fromState(a); } });
+  live = initLive({ $, esc, getTt: () => tt, hm, toMin, minTransfer: transferMin, bringNote, place, setPlace, onFollow: o => nav.start(o) });
+  nav = initNavigate({ $, getTt: () => tt, hm, toMin, today: berlinToday, minTransfer: transferMin, bringNote, onWays: a => { showTab('live', false); live.fromState(a); } });
+  bring = loadItem();
+  paintBring();
   $('#nowon').checked = state.now;
   if (!state.now) $('#t0').value = state.t0;
   $('#stay').value = state.stay; $('#tr').value = state.tr;
 
   // a day or a time set by hand is not the clock any more; the box says "Now" again and the bar follows the clock
   for (const id of ['date', 't0']) $('#' + id).addEventListener('change', () => { setNow(false); persist(); renderTab(); });
-  for (const id of ['stay', 'tr']) $('#' + id).addEventListener('change', () => { persist(); renderTab(); });
+  $('#stay').addEventListener('change', () => { persist(); renderTab(); });
+  // The two inputs of the change time, the box "Minimum change" and what is brought, do the same when they change: the line
+  // under "I bring" (it states the total), the card of Navigate, and the tab that is shown.
+  const changedTime = () => { persist(); paintBring(); nav.refresh(); renderTab(); };
+  $('#tr').addEventListener('change', changedTime);
+  // what is brought: kept on the device
+  $('#bring').addEventListener('change', () => { bring = normalizeItem($('#bring').value); saveItem(bring); changedTime(); });
   $('#nowon').addEventListener('change', () => { if ($('#nowon').checked) applyClock(); persist(); renderTab(); });
   // text typed into a station box and left again: the bar means what it says now
   $('#src').addEventListener('change', () => { fromSource = 'manual'; changedPlace(); });
@@ -453,6 +482,7 @@ function refreshLanguage() {
   $('#lang').value = lang();
   paintReachLabel();
   if (!tt || !uiReady) return;
+  paintBring();
   fillDates(tt.dateOf(+$('#date').value));
   live.refresh();
   nav.refresh();
