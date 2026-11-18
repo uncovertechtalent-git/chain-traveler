@@ -14,6 +14,8 @@ version 0. It changes how much time a change gets and shows general notes. It do
 2. **General notes.** With something brought, a short note sits under the results (the chain, Plan B, the departures, the reach
    map, and the Navigate card). It is guidance, not a rule for a train, and it says so. With nothing brought there is no note,
    and every result is the one of before the setting existed.
+3. **The mark "tight change" moves with it.** A change is marked tight when it is within 2 minutes of the minimum, so with a
+   bicycle (4 in the box and 4 more) it is tight up to 10 minutes, where it was tight up to 6.
 
 | I bring | Extra minutes per change |
 |---|---|
@@ -24,6 +26,8 @@ version 0. It changes how much time a change gets and shows general notes. It do
 
 **These numbers are placeholders** until the owner sets them. They are four named constants in one place
 ([`app/bring.js`](../app/bring.js): `NOTHING_EXTRA_MIN`, `BICYCLE_EXTRA_MIN`, `FOLDING_EXTRA_MIN`, `SCOOTER_EXTRA_MIN`).
+The line under the box reports what the app does with them, not a measured time. Shipping the placeholders as they are is the
+owner's decision; setting others is a change of those four constants and nothing else.
 
 ## What it does not do yet
 
@@ -32,8 +36,6 @@ version 0. It changes how much time a change gets and shows general notes. It do
   bicycle, and it does not pretend to.
 - **No rule per operator, line, region, or hour.** A bicycle ban at rush hour, a bicycle ticket that is free in one region and not
   in the next, a line that asks for a reservation in summer: none of it is in v0.
-- **The mark "tight change" moves with the setting.** A change is tight when it is within 2 minutes of the minimum, so with a
-  bicycle (4 and 4) it is tight up to 10 minutes, where it was tight up to 6.
 - **A walk between two stations gets no extra time.** The scan adds nothing to a change that is a footpath, as before.
 - **The Departures tab has no change time**, so the setting adds nothing there but the note.
 
