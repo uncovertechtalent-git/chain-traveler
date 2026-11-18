@@ -38,7 +38,16 @@
         </label>
         <label><span data-i18n="field.date">Date</span><select id="date"></select></label>
         <label><span data-i18n="field.time">Time</span><input id="t0" type="time" value="06:00"></label>
+        <label class="wide"><span data-i18n="field.bring">I bring</span>
+          <select id="bring">
+            <option value="none" data-i18n="bring.none">Nothing</option>
+            <option value="bike" data-i18n="bring.bike">A bicycle</option>
+            <option value="folding" data-i18n="bring.folding">A folding bicycle</option>
+            <option value="scooter" data-i18n="bring.scooter">An e-scooter</option>
+          </select>
+        </label>
       </div>
+      <p id="bringhint" class="note bringhint" aria-live="polite" hidden></p>
       <div class="where"><button id="llocate" type="button" class="primary" data-i18n="btn.locate">Use my location</button> <label class="outl nowbox"><input id="nowon" type="checkbox" checked> <span data-i18n="field.now">Now</span></label> <span id="lwhere" class="note" aria-live="polite"></span></div>
       <details class="note moreopts"><summary data-i18n="field.change">Minimum change (min)</summary>
         <input id="tr" type="number" min="0" max="20" value="4" aria-label="Minimum change (min)" data-i18n-aria="field.change">
@@ -86,6 +95,7 @@
       </div>
       <div class="mapbox"><canvas id="map"></canvas><div id="tip" class="tip" hidden></div></div>
       <p class="note" data-i18n="reach.note">Every dot is a station reachable by regional train. Colour shows how soon you can be there from the start station. Click a dot to chain a trip there.</p>
+      <div id="reach-bring"></div>
     </section>
   </main>
 

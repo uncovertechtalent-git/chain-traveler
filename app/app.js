@@ -6,6 +6,7 @@ import { initLive } from './live.js';
 import { initNavigate } from './navigate.js';
 import { berlinClock, tick as clockStep, atLaunch, onReturn, migrate } from './here.js';
 import { initTheme } from './theme.js';
+import { loadItem, saveItem, normalizeItem, changeTime, extraMin, noteKeys } from './bring.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -15,6 +16,7 @@ const DEFAULTS = { date: '', src: '', dst: '', via: '', t0: '06:00', stay: 180, 
 let tt, state, store, manifest, uiReady = false, lastCheck = 0, lastPlan = null, reachCache = null, live = null, nav = null;
 let fromSource = '';      // where "I am at" came from: 'gps' (the device said so), 'manual' (a station was picked) or ''
 let lastLocate = 0;       // when the device was last asked for the position, to keep the silent asks apart
+let bring = 'none';       // what the traveller brings: 'none', 'bike', 'folding' or 'scooter' (app/bring.js); kept on the device
 
 function loadState() {
   let raw = null;
@@ -54,11 +56,29 @@ function picker(input, onPick) {
 
 let pSrc, pDst, pVia;
 
+// The minimum change every scan is asked for: the box "Minimum change" plus what the traveller brings. This is the one
+// place that adds the two; the chain, the reach map, Plan B and Navigate all take their change time from here.
+const transferMin = () => changeTime($('#tr').value, bring);
+
 function currentInputs() {
   return {
     day: +$('#date').value, src: pSrc.get(), dst: pDst.get(), via: pVia.get(),
-    t0: toMin($('#t0').value), stay: Math.max(0, +$('#stay').value || 0), tr: Math.max(0, +$('#tr').value || 0),
+    t0: toMin($('#t0').value), stay: Math.max(0, +$('#stay').value || 0), tr: transferMin(),
   };
+}
+
+// What the traveller brings: the box in the bar, the line under it, and the general notes under the results (none when
+// nothing is brought).
+function paintBring() {
+  $('#bring').value = bring;
+  const hint = $('#bringhint');
+  hint.hidden = bring === 'none';
+  hint.textContent = bring === 'none' ? '' : t('bring.hint', { extra: minutes(extraMin(bring)), total: minutes(transferMin()) });
+}
+function bringNote() {
+  const keys = noteKeys(bring);
+  if (!keys.length) return '';
+  return `<div class="bringnote" role="note" aria-label="${esc(t('bring.note.label'))}"><p>${th('bring.note.lead')}</p><ul>${keys.map(k => `<li>${th(k)}</li>`).join('')}</ul></div>`;
 }
 
 function persist() {
@@ -199,7 +219,7 @@ function renderChain(res, q) {
     }
     h += '</ul></div>';
   });
-  return h + '</details>';
+  return h + '</details>' + bringNote();
 }
 
 // ---- reach map ----
@@ -219,6 +239,7 @@ const py = (lat, h) => (GEO.lat1 - lat) / (GEO.lat1 - GEO.lat0) * h;
 
 function drawReach() {
   const q = currentInputs();
+  $('#reach-bring').innerHTML = bringNote();
   const c = $('#map');
   const { w, h, r } = sizeCanvas(c);
   const ctx = c.getContext('2d');
@@ -275,6 +296,7 @@ function drawDeps() {
   out.innerHTML = deps.length
     ? `<table class="deps"><tr><th class="dt">${th('deps.th.departs')}</th><th class="dl">${th('deps.th.line')}</th><th>${th('deps.th.towards')}</th><th>${th('deps.th.next')}</th></tr>${deps.map(d => `<tr><td class="t">${hm(d.dep)}${d.dep >= 1440 ? ' <span class="mute">' + esc(dayName(day, d.dep)) + '</span>' : ''}</td><td><span class="line">${esc(d.line)}</span></td><td>${esc(tt.names[d.term])}</td><td class="mute">${esc(tt.names[d.next])} ${hm(d.arr)}</td></tr>`).join('')}</table>`
     : `<p class="note">${th('deps.none')}</p>`;
+  if (deps.length) out.innerHTML += bringNote();
 }
 
 // ---- tabs ----
@@ -384,9 +406,12 @@ function initUi() {
   pSrc = picker($('#src'), () => { fromSource = 'manual'; changedPlace(); });
   pDst = picker($('#dst'), changedPlace);
   pVia = picker($('#via'), () => renderTab());
-  const minTransfer = () => Math.max(0, +$('#tr').value || 0);
-  live = initLive({ $, esc, getTt: () => tt, hm, toMin, minTransfer, place, setPlace, onFollow: o => nav.start(o) });
-  nav = initNavigate({ $, getTt: () => tt, hm, toMin, today: berlinToday, minTransfer, onWays: a => { showTab('live', false); live.fromState(a); } });
+  live = initLive({ $, esc, getTt: () => tt, hm, toMin, minTransfer: transferMin, bringNote, place, setPlace, onFollow: o => nav.start(o) });
+  nav = initNavigate({ $, getTt: () => tt, hm, toMin, today: berlinToday, minTransfer: transferMin, bringNote, onWays: a => { showTab('live', false); live.fromState(a); } });
+  bring = loadItem();
+  paintBring();
+  // what is brought: kept on the device, and every tab and the card of Navigate are drawn again with the new change time
+  $('#bring').addEventListener('change', () => { bring = normalizeItem($('#bring').value); saveItem(bring); paintBring(); nav.refresh(); renderTab(); });
   $('#nowon').checked = state.now;
   if (!state.now) $('#t0').value = state.t0;
   $('#stay').value = state.stay; $('#tr').value = state.tr;
@@ -453,6 +478,7 @@ function refreshLanguage() {
   $('#lang').value = lang();
   paintReachLabel();
   if (!tt || !uiReady) return;
+  paintBring();
   fillDates(tt.dateOf(+$('#date').value));
   live.refresh();
   nav.refresh();
