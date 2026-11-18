@@ -293,10 +293,10 @@ function drawDeps() {
   if (s < 0) { out.innerHTML = `<p class="note">${th('deps.pick')}</p>`; return; }
   const day = +$('#date').value, t = toMin($('#t0').value);
   const deps = tt.departures({ day, station: s, t, limit: 14 });
-  out.innerHTML = deps.length
+  const list = deps.length
     ? `<table class="deps"><tr><th class="dt">${th('deps.th.departs')}</th><th class="dl">${th('deps.th.line')}</th><th>${th('deps.th.towards')}</th><th>${th('deps.th.next')}</th></tr>${deps.map(d => `<tr><td class="t">${hm(d.dep)}${d.dep >= 1440 ? ' <span class="mute">' + esc(dayName(day, d.dep)) + '</span>' : ''}</td><td><span class="line">${esc(d.line)}</span></td><td>${esc(tt.names[d.term])}</td><td class="mute">${esc(tt.names[d.next])} ${hm(d.arr)}</td></tr>`).join('')}</table>`
     : `<p class="note">${th('deps.none')}</p>`;
-  if (deps.length) out.innerHTML += bringNote();
+  out.innerHTML = list + (deps.length ? bringNote() : '');
 }
 
 // ---- tabs ----
@@ -410,15 +410,19 @@ function initUi() {
   nav = initNavigate({ $, getTt: () => tt, hm, toMin, today: berlinToday, minTransfer: transferMin, bringNote, onWays: a => { showTab('live', false); live.fromState(a); } });
   bring = loadItem();
   paintBring();
-  // what is brought: kept on the device, and every tab and the card of Navigate are drawn again with the new change time
-  $('#bring').addEventListener('change', () => { bring = normalizeItem($('#bring').value); saveItem(bring); paintBring(); nav.refresh(); renderTab(); });
   $('#nowon').checked = state.now;
   if (!state.now) $('#t0').value = state.t0;
   $('#stay').value = state.stay; $('#tr').value = state.tr;
 
   // a day or a time set by hand is not the clock any more; the box says "Now" again and the bar follows the clock
   for (const id of ['date', 't0']) $('#' + id).addEventListener('change', () => { setNow(false); persist(); renderTab(); });
-  for (const id of ['stay', 'tr']) $('#' + id).addEventListener('change', () => { persist(); paintBring(); renderTab(); });   // the line under "I bring" states the total, which the box "Minimum change" is part of
+  $('#stay').addEventListener('change', () => { persist(); renderTab(); });
+  // The two inputs of the change time, the box "Minimum change" and what is brought, do the same when they change: the line
+  // under "I bring" (it states the total), the card of Navigate, and the tab that is shown.
+  const changedTime = () => { persist(); paintBring(); nav.refresh(); renderTab(); };
+  $('#tr').addEventListener('change', changedTime);
+  // what is brought: kept on the device
+  $('#bring').addEventListener('change', () => { bring = normalizeItem($('#bring').value); saveItem(bring); changedTime(); });
   $('#nowon').addEventListener('change', () => { if ($('#nowon').checked) applyClock(); persist(); renderTab(); });
   // text typed into a station box and left again: the bar means what it says now
   $('#src').addEventListener('change', () => { fromSource = 'manual'; changedPlace(); });

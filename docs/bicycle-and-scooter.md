@@ -32,6 +32,8 @@ version 0. It changes how much time a change gets and shows general notes. It do
   bicycle, and it does not pretend to.
 - **No rule per operator, line, region, or hour.** A bicycle ban at rush hour, a bicycle ticket that is free in one region and not
   in the next, a line that asks for a reservation in summer: none of it is in v0.
+- **The mark "tight change" moves with the setting.** A change is tight when it is within 2 minutes of the minimum, so with a
+  bicycle (4 and 4) it is tight up to 10 minutes, where it was tight up to 6.
 - **A walk between two stations gets no extra time.** The scan adds nothing to a change that is a footpath, as before.
 - **The Departures tab has no change time**, so the setting adds nothing there but the note.
 
@@ -72,7 +74,7 @@ Sources (all read on 2026-11-18):
 10. evb Elbe-Weser, "E-Scooter in Bussen ab dem 01.06. ausgeschlossen" (passes on the notice of the Verkehrsverbund Bremen/Niedersachsen), <https://www.evb-elbe-weser.de/e-scooter-in-bussen-ab-dem-01-06-ausgeschlossen/>
 11. ADAC, "E-Scooter im Nahverkehr: Verbot im ÖPNV" (17 November 2025, secondary), <https://www.adac.de/news/verkehr-e-scooter-mitnahmeverbot-nahverkehr/>
 
-What is not checked: no source was found that names every operator in the feed, which is why the notes say "often", "usually", and
+These pages change. Read them again before any note is changed and before the rules file of v1 is started. What is not checked: no source was found that names every operator in the feed, which is why the notes say "often", "usually", and
 "some". Pages of the transport associations and operators change, and carriage rules differ for each of them; the note under a
 result is a reason to look at the operator's own page, not a replacement for it. One page of the list shows two prices for the
 same day ticket (7.50 and 6.50 euros); the notes do not give a price.
