@@ -67,13 +67,14 @@ function currentInputs() {
   };
 }
 
-// What the traveller brings: the box in the bar, the line under it, and the general notes under the results (none when
-// nothing is brought).
+// What the traveller brings: the box in the bar, the line under it (the total change time, so it is drawn again when the
+// box "Minimum change" changes), and the note under the reach map. The notes under the other results are drawn with them.
 function paintBring() {
   $('#bring').value = bring;
   const hint = $('#bringhint');
   hint.hidden = bring === 'none';
   hint.textContent = bring === 'none' ? '' : t('bring.hint', { extra: minutes(extraMin(bring)), total: minutes(transferMin()) });
+  $('#reach-bring').innerHTML = bringNote();
 }
 function bringNote() {
   const keys = noteKeys(bring);
@@ -239,7 +240,6 @@ const py = (lat, h) => (GEO.lat1 - lat) / (GEO.lat1 - GEO.lat0) * h;
 
 function drawReach() {
   const q = currentInputs();
-  $('#reach-bring').innerHTML = bringNote();
   const c = $('#map');
   const { w, h, r } = sizeCanvas(c);
   const ctx = c.getContext('2d');
@@ -418,7 +418,7 @@ function initUi() {
 
   // a day or a time set by hand is not the clock any more; the box says "Now" again and the bar follows the clock
   for (const id of ['date', 't0']) $('#' + id).addEventListener('change', () => { setNow(false); persist(); renderTab(); });
-  for (const id of ['stay', 'tr']) $('#' + id).addEventListener('change', () => { persist(); renderTab(); });
+  for (const id of ['stay', 'tr']) $('#' + id).addEventListener('change', () => { persist(); paintBring(); renderTab(); });   // the line under "I bring" states the total, which the box "Minimum change" is part of
   $('#nowon').addEventListener('change', () => { if ($('#nowon').checked) applyClock(); persist(); renderTab(); });
   // text typed into a station box and left again: the bar means what it says now
   $('#src').addEventListener('change', () => { fromSource = 'manual'; changedPlace(); });

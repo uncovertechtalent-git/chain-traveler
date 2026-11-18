@@ -188,6 +188,7 @@ test('the page: one box in the bar with a label and four options; one place adds
   const reads = app.split('\n').filter(l => l.includes("#tr').value"));
   assert.equal(reads.length, 3, 'the box is read in three places: persist, restore and the change time\n' + reads.join('\n'));
   assert.equal(reads.filter(l => l.includes('changeTime(')).length, 1, 'only transferMin adds the item');
+  assert.match(app, /addEventListener\('change', \(\) => \{ persist\(\); paintBring\(\); renderTab\(\); \}\)/, 'the line under the box states the total, so a changed "Minimum change" draws it again');
   assert.match(app, /tr: transferMin\(\)/, 'the chain and the reach map take their change time from transferMin');
   assert.match(app, /initLive\(\{[^}]*minTransfer: transferMin/, 'Plan B');
   assert.match(app, /initNavigate\(\{[^}]*minTransfer: transferMin/, 'Navigate');
