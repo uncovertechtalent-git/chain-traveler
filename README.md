@@ -205,8 +205,8 @@ else English. Station names, line names and the name of the app are never transl
 
 The "I bring" box in the bar (nothing, a bicycle, a folding bicycle, an e-scooter) is kept on the device (`ct-bring`) and adds
 minutes to the minimum change wherever the timetable is scanned: the chain, the reach map, Plan B, and Navigate. The extra
-minutes are four named constants in `app/bring.js` (nothing 0, bicycle 4, folding bicycle 2, e-scooter 2), placeholders until
-the owner sets them. With something brought, a short general note sits under the results.
+minutes are four named constants in `app/bring.js` (nothing 0, bicycle 4, folding bicycle 2, e-scooter 2), set by
+the owner on 2026-11-22 as a chosen margin, not measured times. With something brought, a short general note sits under the results.
 
 This is version 0, and it knows nothing about a particular train: the feed has no bicycle data, so no train is hidden or marked,
 and the notes are guidance, not rules. The rules per operator and region are a later step. What the notes rest on, what is not
