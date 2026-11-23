@@ -8,8 +8,8 @@
 
 export const ITEMS = ['none', 'bike', 'folding', 'scooter'];
 
-// Extra minutes on every change. PLACEHOLDERS until the owner sets them: these are the first guesses of the brief, not
-// measured times. They live here and nowhere else.
+// Extra minutes on every change. Set by the owner on 2026-11-22 (the brief's first values, kept); they are a chosen
+// margin, not measured times. They live here and nowhere else.
 export const NOTHING_EXTRA_MIN = 0;
 export const BICYCLE_EXTRA_MIN = 4;
 export const FOLDING_EXTRA_MIN = 2;

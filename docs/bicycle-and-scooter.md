@@ -24,10 +24,11 @@ version 0. It changes how much time a change gets and shows general notes. It do
 | A folding bicycle | 2 |
 | An e-scooter | 2 |
 
-**These numbers are placeholders** until the owner sets them. They are four named constants in one place
+**The owner set these numbers on 2026-11-22**, keeping the first values of the brief. They are a chosen margin, not
+measured times. They are four named constants in one place
 ([`app/bring.js`](../app/bring.js): `NOTHING_EXTRA_MIN`, `BICYCLE_EXTRA_MIN`, `FOLDING_EXTRA_MIN`, `SCOOTER_EXTRA_MIN`).
-The line under the box reports what the app does with them, not a measured time. Shipping the placeholders as they are is the
-owner's decision; setting others is a change of those four constants and nothing else.
+The line under the box reports what the app does with them, not a measured time. Changing them is a change of those
+four constants and nothing else.
 
 ## What it does not do yet
 
